@@ -182,15 +182,14 @@
                     dayElement.classList.add('disabled');
                 } else {
                     dayElement.classList.add('available-date');
-                    const dateStr = currentDate.toISOString().split('T')[0];
-                    dayElement.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Create date from string to avoid timezone issues
-                        const [year, month, day] = dateStr.split('-');
-                        const selectedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                        selectDate(selectedDate);
-                    });
+                    // Create a closure to capture the current date value
+                    (function(capturedDate) {
+                        dayElement.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            selectDate(new Date(capturedDate));
+                        });
+                    })(new Date(currentDate));
                 }
                 
                 dayElement.textContent = currentDate.getDate();
