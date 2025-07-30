@@ -6,10 +6,22 @@ require('dotenv').config();
 const express = require('express');
 const { google } = require('googleapis');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from scripts directory
+app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
+
+// Development route for inject.js with no-cache headers
+app.get('/inject.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.sendFile(path.join(__dirname, 'scripts', 'inject.js'));
+});
 
 // Configuration - Update these values
 const CONFIG = {

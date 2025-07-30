@@ -8,7 +8,10 @@
     const CONFIG = {
         // Your backend API endpoint for checking availability
         // Update this to your actual backend URL (ngrok or hosted service)
-        availabilityEndpoint: 'https://stepsandstories.ngrok.app/api/availability',
+        // For development: Use same domain as the script is loaded from
+        availabilityEndpoint: window.location.hostname.includes('ngrok') 
+            ? `${window.location.protocol}//${window.location.hostname}/api/availability`
+            : 'https://stepsandstories.ngrok.app/api/availability',
         
         // How many days ahead to show bookings
         daysAhead: 30,
