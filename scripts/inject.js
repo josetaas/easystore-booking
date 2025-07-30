@@ -60,8 +60,6 @@
         bookingContainer.id = 'booking-widget';
         bookingContainer.innerHTML = `
             <div class="booking-widget-container">
-                <h3 class="booking-title">Select Your Booking Date & Time</h3>
-                
                 <div class="booking-step" id="date-selection">
                     <h4>Choose a Date</h4>
                     <div id="calendar-container">
@@ -569,31 +567,20 @@
             buyNowButton.disabled = true;
             buyNowButton.style.opacity = '0.5';
             buyNowButton.style.cursor = 'not-allowed';
-            
-            // Add overlay message
-            let overlay = document.getElementById('booking-overlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'booking-overlay';
-                overlay.innerHTML = 'Please select a date and time above';
-                buyNowButton.parentNode.appendChild(overlay);
-            }
         }
     }
     
     // Enable buy now button when booking is selected
     function enableBuyNowButton() {
-        const buyNowButton = document.getElementById('BuyNowButton');
-        const overlay = document.getElementById('booking-overlay');
-        
-        if (buyNowButton) {
-            buyNowButton.disabled = false;
-            buyNowButton.style.opacity = '1';
-            buyNowButton.style.cursor = 'pointer';
-        }
-        
-        if (overlay) {
-            overlay.remove();
+        // Only enable if both date and time are selected
+        if (selectedDate && selectedTime) {
+            const buyNowButton = document.getElementById('BuyNowButton');
+            
+            if (buyNowButton) {
+                buyNowButton.disabled = false;
+                buyNowButton.style.opacity = '1';
+                buyNowButton.style.cursor = 'pointer';
+            }
         }
     }
     
@@ -609,14 +596,6 @@
                 margin: 24px 0;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            }
-            
-            .booking-title {
-                color: #1a1a1a;
-                margin-bottom: 32px;
-                text-align: left;
-                font-size: 24px;
-                font-weight: 600;
             }
             
             .booking-step h4 {
@@ -809,21 +788,6 @@
             
             .error {
                 color: #d32f2f;
-            }
-            
-            #booking-overlay {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0, 0, 0, 0.85);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 3px;
-                font-size: 13px;
-                pointer-events: none;
-                z-index: 10;
-                white-space: nowrap;
             }
             
             #BuyNowButton {
