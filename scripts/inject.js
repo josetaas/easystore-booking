@@ -634,8 +634,23 @@
                 buyNowButton.style.cursor = 'pointer';
                 buyNowButton.style.pointerEvents = 'auto';
                 
-                // Remove click prevention
-                buyNowButton.onclick = null;
+                // Add click handler to delete cart cookie before proceeding
+                buyNowButton.onclick = function(e) {
+                    // Delete the cart cookie with multiple path variations
+                    const paths = ['/', '', window.location.pathname];
+                    const domains = ['', window.location.hostname, '.' + window.location.hostname];
+                    
+                    paths.forEach(path => {
+                        domains.forEach(domain => {
+                            document.cookie = `cart=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path};${domain ? ' domain=' + domain + ';' : ''}`;
+                        });
+                    });
+                    
+                    console.log('Cart cookie deleted');
+                    
+                    // Allow the default form submission to continue
+                    // The form will submit after this handler completes
+                };
             }
         }
     }
