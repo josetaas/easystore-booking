@@ -60,12 +60,20 @@
                 <h3 class="booking-title">Select Your Booking Date & Time</h3>
                 
                 <div class="booking-step" id="date-selection">
-                    <h4>Step 1: Choose a Date</h4>
+                    <h4>Choose a Date</h4>
                     <div id="calendar-container">
                         <div class="calendar-header">
-                            <button id="prev-month" class="nav-button">&lt;</button>
+                            <button id="prev-month" class="nav-button">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
                             <span id="current-month"></span>
-                            <button id="next-month" class="nav-button">&gt;</button>
+                            <button id="next-month" class="nav-button">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
                         </div>
                         <div id="calendar-grid"></div>
                     </div>
@@ -75,9 +83,14 @@
                 </div>
                 
                 <div class="booking-step" id="time-selection" style="display: none;">
-                    <h4>Step 2: Choose a Time</h4>
+                    <h4>Choose a Time</h4>
                     <div id="time-slots"></div>
-                    <button id="change-date" class="secondary-button">← Change Date</button>
+                    <button id="change-date" class="secondary-button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Change Date
+                    </button>
                 </div>
                 
                 <div class="booking-summary" id="booking-summary" style="display: none;">
@@ -371,8 +384,8 @@
             });
             
             detailsContainer.innerHTML = `
-                <div class="booking-detail">📅 ${formattedDate}</div>
-                <div class="booking-detail">🕐 ${selectedTime}</div>
+                <div class="booking-detail">${formattedDate}</div>
+                <div class="booking-detail">${selectedTime}</div>
             `;
             
             summaryContainer.style.display = 'block';
@@ -535,190 +548,201 @@
         style.textContent = `
             .booking-widget-container {
                 background: #ffffff;
-                border: 1px solid #e5e5e5;
-                border-radius: 4px;
-                padding: 24px;
-                margin: 20px 0;
+                border: none;
+                border-radius: 12px;
+                padding: 32px;
+                margin: 24px 0;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             }
             
             .booking-title {
                 color: #1a1a1a;
-                margin-bottom: 24px;
-                text-align: center;
-                font-size: 18px;
-                font-weight: 500;
+                margin-bottom: 32px;
+                text-align: left;
+                font-size: 24px;
+                font-weight: 600;
             }
             
             .booking-step h4 {
-                color: #666;
-                margin-bottom: 16px;
-                font-size: 14px;
-                font-weight: 500;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
+                color: #1a1a1a;
+                margin-bottom: 20px;
+                font-size: 16px;
+                font-weight: 600;
+                text-transform: none;
+                letter-spacing: normal;
             }
             
             .calendar-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 20px;
+                margin-bottom: 28px;
             }
             
             .nav-button {
                 background: transparent;
-                color: #666;
-                border: 1px solid #e5e5e5;
-                padding: 6px 12px;
-                border-radius: 3px;
+                color: #1a1a1a;
+                border: none;
+                padding: 8px;
+                border-radius: 8px;
                 cursor: pointer;
-                font-size: 16px;
+                font-size: 20px;
                 transition: all 0.2s ease;
+                width: 36px;
+                height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             
             .nav-button:hover {
                 background: #f5f5f5;
-                border-color: #ccc;
             }
             
             #current-month {
-                font-weight: 500;
-                font-size: 16px;
+                font-weight: 600;
+                font-size: 18px;
                 color: #1a1a1a;
             }
             
             .calendar-row {
                 display: grid;
                 grid-template-columns: repeat(7, 1fr);
-                gap: 1px;
-                margin-bottom: 1px;
+                gap: 4px;
+                margin-bottom: 4px;
             }
             
             .calendar-day-header {
                 text-align: center;
-                font-weight: 500;
-                padding: 8px 4px;
-                font-size: 11px;
-                color: #999;
+                font-weight: 600;
+                padding: 12px 4px;
+                font-size: 12px;
+                color: #666;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             }
             
             .calendar-day {
                 text-align: center;
-                padding: 10px 4px;
-                background: white;
+                padding: 0;
+                background: transparent;
                 cursor: pointer;
-                min-height: 36px;
+                min-height: 40px;
+                height: 40px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-size: 14px;
-                color: #333;
+                color: #1a1a1a;
                 transition: all 0.15s ease;
-                border: 1px solid transparent;
+                border-radius: 8px;
+                position: relative;
+                font-weight: 500;
             }
             
             .calendar-day.other-month {
-                color: #ddd;
-                background: #fafafa;
+                color: #ccc;
                 cursor: default;
             }
             
             .calendar-day.disabled {
-                color: #ddd;
-                background: #fafafa;
+                color: #ccc;
                 cursor: not-allowed;
             }
             
             .calendar-day.has-availability {
-                background: #f0f9f0;
-                color: #2e7d2e;
+                color: #1a1a1a;
             }
             
             .calendar-day.has-availability:hover {
-                background: #e1f5e1;
-                border-color: #4CAF50;
-            }
-            
-            .calendar-day.fully-booked {
-                background: #fef0f0;
-                color: #d32f2f;
-                cursor: not-allowed;
-            }
-            
-            .calendar-day.selected {
-                background: #1a1a1a !important;
-                color: white;
-                border-color: #1a1a1a;
-            }
-            
-            #time-slots {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-                gap: 8px;
-                margin: 16px 0;
-            }
-            
-            .time-slot {
-                padding: 10px 12px;
-                border: 1px solid #e5e5e5;
-                background: white;
-                border-radius: 3px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: all 0.15s ease;
-                text-align: center;
-            }
-            
-            .time-slot.available:hover {
-                border-color: #666;
                 background: #f5f5f5;
             }
             
-            .time-slot.selected {
-                background: #1a1a1a;
+            .calendar-day.fully-booked {
+                color: #ccc;
+                cursor: not-allowed;
+                text-decoration: line-through;
+            }
+            
+            .calendar-day.selected {
+                background: #0066ff !important;
                 color: white;
-                border-color: #1a1a1a;
+                font-weight: 600;
+            }
+            
+            #time-slots {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                margin: 24px 0;
+            }
+            
+            .time-slot {
+                padding: 16px 20px;
+                border: 2px solid #e5e7eb;
+                background: white;
+                border-radius: 10px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: 500;
+                transition: all 0.15s ease;
+                text-align: center;
+                color: #1a1a1a;
+            }
+            
+            .time-slot.available:hover {
+                border-color: #0066ff;
+                background: #f0f7ff;
+            }
+            
+            .time-slot.selected {
+                background: #0066ff;
+                color: white;
+                border-color: #0066ff;
             }
             
             .time-slot.booked {
-                background: #fafafa;
-                color: #ccc;
+                background: #f9fafb;
+                color: #9ca3af;
                 cursor: not-allowed;
-                border-color: #f0f0f0;
+                border-color: #e5e7eb;
             }
             
             .secondary-button {
                 background: transparent;
-                color: #666;
-                border: 1px solid #e5e5e5;
-                padding: 8px 16px;
-                border-radius: 3px;
+                color: #6b7280;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
                 cursor: pointer;
-                margin-top: 16px;
+                margin-top: 20px;
                 font-size: 14px;
+                font-weight: 500;
                 transition: all 0.15s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
             }
             
             .secondary-button:hover {
                 background: #f5f5f5;
-                border-color: #ccc;
+                color: #1a1a1a;
             }
             
             .booking-summary {
-                background: #f5f5f5;
-                border: 1px solid #e5e5e5;
-                border-radius: 3px;
-                padding: 16px;
-                margin-top: 20px;
+                background: #f0f7ff;
+                border: 2px solid #0066ff;
+                border-radius: 10px;
+                padding: 20px;
+                margin-top: 24px;
             }
             
             .booking-detail {
-                margin: 6px 0;
-                font-size: 14px;
-                color: #333;
+                margin: 8px 0;
+                font-size: 16px;
+                color: #1a1a1a;
+                font-weight: 500;
             }
             
             .loading-indicator, .loading, .error, .no-slots {
@@ -753,10 +777,15 @@
             
             /* Calendar grid styling */
             #calendar-grid {
-                border: 1px solid #e5e5e5;
-                border-radius: 3px;
-                overflow: hidden;
-                background: #fafafa;
+                border: none;
+                border-radius: 12px;
+                overflow: visible;
+                background: transparent;
+            }
+            
+            /* Modern calendar header styling */
+            .calendar-header-row {
+                margin-bottom: 16px;
             }
             
             /* Prevent form submission from widget clicks */
