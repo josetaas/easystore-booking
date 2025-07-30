@@ -442,12 +442,24 @@
     
     // Hide Add to Cart button
     function hideAddToCartButton() {
-        // Try multiple selectors that EasyStore might use
+        // Specifically target the AddToCart button by ID
+        const addToCartButton = document.getElementById('AddToCart');
+        if (addToCartButton) {
+            addToCartButton.style.display = 'none';
+            console.log('Hidden AddToCart button');
+            
+            // Also hide its parent container if it only contains this button
+            const parent = addToCartButton.parentElement;
+            if (parent && parent.children.length === 1) {
+                parent.style.display = 'none';
+            }
+        }
+        
+        // Try other common selectors as fallback
         const addToCartSelectors = [
-            '#AddToCart',
             '#AddToCartButton',
-            'button[name="add"]',
-            'input[name="add"]',
+            'button[name="add"]:not(#BuyNowButton)',
+            'input[name="add"]:not(#BuyNowButton)',
             'button[type="submit"]:not(#BuyNowButton)',
             '.product-form__cart-submit:not(#BuyNowButton)',
             '.btn--add-to-cart'
@@ -464,14 +476,18 @@
             });
         });
         
-        // Also hide any parent containers that might only contain the Add to Cart button
-        const cartButtons = document.querySelectorAll('.product-form__buttons');
-        cartButtons.forEach(container => {
-            const hasOnlyAddToCart = container.children.length === 1 && 
-                                    !container.querySelector('#BuyNowButton');
-            if (hasOnlyAddToCart) {
-                container.style.display = 'none';
+        // If AddToCart button appears later (dynamic loading), hide it
+        const observer = new MutationObserver((mutations) => {
+            const addToCart = document.getElementById('AddToCart');
+            if (addToCart && addToCart.style.display !== 'none') {
+                addToCart.style.display = 'none';
+                console.log('Hidden dynamically loaded AddToCart button');
             }
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
         });
     }
     
