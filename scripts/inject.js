@@ -634,22 +634,64 @@
                 buyNowButton.style.cursor = 'pointer';
                 buyNowButton.style.pointerEvents = 'auto';
                 
-                // Add click handler to delete cart cookie before proceeding
+                // Add click handler to clear cart before proceeding
                 buyNowButton.onclick = function(e) {
-                    // Delete the cart cookie with multiple path variations
-                    const paths = ['/', '', window.location.pathname];
-                    const domains = ['', window.location.hostname, '.' + window.location.hostname];
+                    // Prevent default submission initially
+                    e.preventDefault();
+                    e.stopPropagation();
                     
-                    paths.forEach(path => {
-                        domains.forEach(domain => {
-                            document.cookie = `cart=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path};${domain ? ' domain=' + domain + ';' : ''}`;
+                    // Clear the cart using EasyStore API
+                    if (window.EasyStore && window.EasyStore.Action) {
+                        console.log('Clearing cart before booking...');
+                        
+                        // First retrieve the current cart
+                        window.EasyStore.Action.retrieveCart(function(cart) {
+                            if (cart && cart.items && cart.items.length > 0) {
+                                // Remove each item from the cart
+                                let itemsToRemove = cart.items.length;
+                                let itemsRemoved = 0;
+                                
+                                cart.items.forEach(function(item) {
+                                    window.EasyStore.Action.removeCartItem({
+                                        id: item.id,
+                                        quantity: item.quantity
+                                    }, function(response) {
+                                        itemsRemoved++;
+                                        console.log('Removed item from cart:', item.id);
+                                        
+                                        // When all items are removed, submit the form
+                                        if (itemsRemoved === itemsToRemove) {
+                                            console.log('Cart cleared, submitting booking...');
+                                            // Find the form and submit it
+                                            const form = buyNowButton.closest('form');
+                                            if (form) {
+                                                form.submit();
+                                            }
+                                        }
+                                    });
+                                });
+                            } else {
+                                // Cart is already empty, proceed with submission
+                                console.log('Cart is empty, submitting booking...');
+                                const form = buyNowButton.closest('form');
+                                if (form) {
+                                    form.submit();
+                                }
+                            }
                         });
-                    });
+                    } else {
+                        // EasyStore API not available, try cookie deletion as fallback
+                        console.log('EasyStore API not available, clearing cookies...');
+                        document.cookie = 'cart=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                        
+                        // Submit the form
+                        const form = buyNowButton.closest('form');
+                        if (form) {
+                            form.submit();
+                        }
+                    }
                     
-                    console.log('Cart cookie deleted');
-                    
-                    // Allow the default form submission to continue
-                    // The form will submit after this handler completes
+                    return false;
                 };
             }
         }
