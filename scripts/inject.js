@@ -404,22 +404,25 @@
     
     // Update easystore form with booking details
     function updateEasyStoreForm() {
-        // Add hidden inputs for booking details
-        let bookingDateInput = document.querySelector('input[name="properties[Booking Date]"]');
-        let bookingTimeInput = document.querySelector('input[name="properties[Booking Time]"]');
+        const form = document.getElementById('BuyNowButton')?.closest('form');
+        if (!form) return;
+        
+        // Add hidden inputs for booking details to the form
+        let bookingDateInput = form.querySelector('input[name="properties[Booking Date]"]');
+        let bookingTimeInput = form.querySelector('input[name="properties[Booking Time]"]');
         
         if (!bookingDateInput) {
             bookingDateInput = document.createElement('input');
             bookingDateInput.type = 'hidden';
             bookingDateInput.name = 'properties[Booking Date]';
-            document.body.appendChild(bookingDateInput);
+            form.appendChild(bookingDateInput);
         }
         
         if (!bookingTimeInput) {
             bookingTimeInput = document.createElement('input');
             bookingTimeInput.type = 'hidden';
             bookingTimeInput.name = 'properties[Booking Time]';
-            document.body.appendChild(bookingTimeInput);
+            form.appendChild(bookingTimeInput);
         }
         
         bookingDateInput.value = selectedDate;
@@ -634,72 +637,184 @@
                 buyNowButton.style.cursor = 'pointer';
                 buyNowButton.style.pointerEvents = 'auto';
                 
-                // Add click handler to clear cart before proceeding
-                buyNowButton.onclick = function(e) {
-                    // Prevent default submission initially
+                // Intercept Buy Now to clear cart first
+                const originalType = buyNowButton.type;
+                buyNowButton.type = 'button'; // Prevent default submit
+                
+                buyNowButton.addEventListener('click', function handleBuyNow(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    // Clear the cart using EasyStore API
-                    if (window.EasyStore && window.EasyStore.Action) {
-                        console.log('Clearing cart before booking...');
-                        
-                        // First retrieve the current cart
-                        window.EasyStore.Action.retrieveCart(function(response) {
-                            // Cart data is nested in response.cart
-                            const cart = response && response.cart ? response.cart : response;
-                            
-                            if (cart && cart.items && cart.items.length > 0) {
-                                console.log('Found ' + cart.items.length + ' items in cart, removing...');
-                                
-                                // Remove each item from the cart
-                                let itemsToRemove = cart.items.length;
-                                let itemsRemoved = 0;
-                                
-                                cart.items.forEach(function(item) {
-                                    window.EasyStore.Action.removeCartItem({
-                                        id: item.id,
-                                        quantity: item.quantity
-                                    }, function(removeResponse) {
-                                        itemsRemoved++;
-                                        console.log('Removed item from cart:', item.id);
-                                        
-                                        // When all items are removed, submit the form
-                                        if (itemsRemoved === itemsToRemove) {
-                                            console.log('Cart cleared, submitting booking...');
-                                            // Small delay to ensure cart is updated
-                                            setTimeout(function() {
-                                                const form = buyNowButton.closest('form');
-                                                if (form) {
-                                                    form.submit();
-                                                }
-                                            }, 100);
-                                        }
-                                    });
-                                });
-                            } else {
-                                // Cart is already empty, proceed with submission
-                                console.log('Cart is already empty, submitting booking...');
-                                const form = buyNowButton.closest('form');
-                                if (form) {
-                                    form.submit();
-                                }
-                            }
-                        });
-                    } else {
-                        // EasyStore API not available, try cookie deletion as fallback
-                        console.log('EasyStore API not available, clearing cookies...');
-                        document.cookie = 'cart=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-                        
-                        // Submit the form
-                        const form = buyNowButton.closest('form');
-                        if (form) {
-                            form.submit();
-                        }
-                    }
+                    // Show loading state
+                    buyNowButton.classList.add('btn--loading');
+                    buyNowButton.disabled = true;
                     
-                    return false;
-                };
+                    console.log('Intercepting Buy Now to clear cart first...');
+                    
+                    // Ensure booking properties are in form
+                    updateEasyStoreForm();
+                    
+                    // Check if cart has items
+                    fetch('/new_cart', {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(cartData => {
+                        const cart = cartData.cart || cartData;
+                        
+                        if (cart && cart.items && cart.items.length > 0) {
+                            console.log('Found ' + cart.items.length + ' items in cart, removing them...');
+                            
+                            // Remove each item using the correct API format
+                            let itemsToRemove = cart.items.length;
+                            let itemsProcessed = 0;
+                            let allSuccess = true;
+                            
+                            // Function to proceed after all removals
+                            function proceedWithBuyNow() {
+                                // Verify cart is actually empty
+                                fetch('/new_cart', {
+                                    method: 'GET',
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json'
+                                    }
+                                })
+                                .then(response => response.json())
+                                .then(verifyData => {
+                                    const verifyCart = verifyData.cart || verifyData;
+                                    const remainingItems = verifyCart.items ? verifyCart.items.length : 0;
+                                    
+                                    console.log('Cart verification - remaining items:', remainingItems);
+                                    
+                                    // Remove loading state
+                                    buyNowButton.classList.remove('btn--loading');
+                                    buyNowButton.disabled = false;
+                                    
+                                    // Temporarily remove our handler
+                                    buyNowButton.removeEventListener('click', handleBuyNow);
+                                    
+                                    // Restore original type
+                                    buyNowButton.type = originalType;
+                                    
+                                    // Add a longer delay to ensure cart is fully updated
+                                    setTimeout(() => {
+                                        console.log('Triggering original Buy Now...');
+                                        
+                                        if (window.jQuery) {
+                                            window.jQuery('#BuyNowButton').click();
+                                        } else {
+                                            buyNowButton.click();
+                                        }
+                                        
+                                        // Re-add our handler after a delay
+                                        setTimeout(() => {
+                                            buyNowButton.type = 'button';
+                                            buyNowButton.addEventListener('click', handleBuyNow);
+                                        }, 3000);
+                                    }, 1000);
+                                })
+                                .catch(error => {
+                                    console.error('Error verifying cart:', error);
+                                    // Continue anyway
+                                    buyNowButton.classList.remove('btn--loading');
+                                    buyNowButton.disabled = false;
+                                    buyNowButton.removeEventListener('click', handleBuyNow);
+                                    buyNowButton.type = originalType;
+                                    
+                                    setTimeout(() => {
+                                        if (window.jQuery) {
+                                            window.jQuery('#BuyNowButton').click();
+                                        } else {
+                                            buyNowButton.click();
+                                        }
+                                    }, 500);
+                                });
+                            }
+                            
+                            // Remove all items
+                            const removalPromises = cart.items.map(item => {
+                                const variantId = item.variant_id || (item.variant && item.variant.id);
+                                
+                                return fetch('/cart/remove_item_quantity', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest'
+                                    },
+                                    body: JSON.stringify({
+                                        variant_id: variantId.toString(),
+                                        item_id: item.id.toString(),
+                                        quantity: item.quantity.toString()
+                                    })
+                                })
+                                .then(response => response.json())
+                                .then(result => {
+                                    console.log(`Removed item ${item.id}`);
+                                    return true;
+                                })
+                                .catch(error => {
+                                    console.error('Error removing item:', error);
+                                    allSuccess = false;
+                                    return false;
+                                });
+                            });
+                            
+                            // Wait for all removals to complete
+                            Promise.all(removalPromises).then(results => {
+                                console.log('All removal requests completed');
+                                // Add extra delay to ensure server has processed everything
+                                setTimeout(proceedWithBuyNow, 500);
+                            });
+                        } else {
+                            console.log('Cart is empty, proceeding with Buy Now...');
+                            
+                            // Remove loading state
+                            buyNowButton.classList.remove('btn--loading');
+                            buyNowButton.disabled = false;
+                            
+                            // Temporarily remove our handler
+                            buyNowButton.removeEventListener('click', handleBuyNow);
+                            
+                            // Restore original type
+                            buyNowButton.type = originalType;
+                            
+                            // Trigger the original Buy Now
+                            if (window.jQuery) {
+                                window.jQuery('#BuyNowButton').click();
+                            } else {
+                                buyNowButton.click();
+                            }
+                            
+                            // Re-add our handler
+                            setTimeout(() => {
+                                buyNowButton.type = 'button';
+                                buyNowButton.addEventListener('click', handleBuyNow);
+                            }, 2000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error retrieving cart:', error);
+                        
+                        // Continue anyway
+                        buyNowButton.classList.remove('btn--loading');
+                        buyNowButton.disabled = false;
+                        
+                        // Just trigger the original Buy Now
+                        buyNowButton.removeEventListener('click', handleBuyNow);
+                        buyNowButton.type = originalType;
+                        
+                        if (window.jQuery) {
+                            window.jQuery('#BuyNowButton').click();
+                        } else {
+                            buyNowButton.click();
+                        }
+                    });
+                });
             }
         }
     }
