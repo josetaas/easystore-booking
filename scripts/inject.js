@@ -43,6 +43,11 @@
             return;
         }
         
+        // Disable buy now button immediately
+        buyNowButton.disabled = true;
+        buyNowButton.style.opacity = '0.5';
+        buyNowButton.style.cursor = 'not-allowed';
+        
         // Hide Add to Cart button
         hideAddToCartButton();
         
@@ -51,7 +56,9 @@
         
         createBookingWidget(buyNowButton);
         addCustomStyles();
-        disableBuyNowButton();
+        
+        // Ensure button stays disabled
+        setTimeout(() => disableBuyNowButton(), 100);
     }
     
     // Create the main booking widget
@@ -467,7 +474,8 @@
             // Also hide the quantity container/wrapper if it exists
             const quantityContainer = quantityInput.closest('.product-form__quantity') || 
                                     quantityInput.closest('.quantity-selector') ||
-                                    quantityInput.closest('.quantity');
+                                    quantityInput.closest('.quantity') ||
+                                    quantityInput.closest('quantity-input');
             if (quantityContainer) {
                 quantityContainer.style.display = 'none';
             }
@@ -481,6 +489,17 @@
             console.log('Hidden quantity input and set to 1');
         }
         
+        // Hide quantity-input custom element
+        const quantityInputElements = document.querySelectorAll('quantity-input');
+        quantityInputElements.forEach(element => {
+            element.style.display = 'none';
+            // Set inner input to 1
+            const input = element.querySelector('input[name="quantity"]');
+            if (input) {
+                input.value = '1';
+            }
+        });
+        
         // Also hide quantity buttons if they exist
         const quantityButtons = document.querySelectorAll('.quantity-button, .quantity__button, [data-quantity-button]');
         quantityButtons.forEach(button => {
@@ -489,18 +508,40 @@
         
         // Watch for dynamically loaded quantity elements
         const quantityObserver = new MutationObserver((mutations) => {
+            // Check for quantity input by ID
             const quantity = document.getElementById('Quantity');
             if (quantity && quantity.style.display !== 'none') {
                 quantity.value = '1';
                 quantity.style.display = 'none';
                 const container = quantity.closest('.product-form__quantity') || 
                                 quantity.closest('.quantity-selector') ||
-                                quantity.closest('.quantity');
+                                quantity.closest('.quantity') ||
+                                quantity.closest('quantity-input');
                 if (container) {
                     container.style.display = 'none';
                 }
                 console.log('Hidden dynamically loaded quantity input');
             }
+            
+            // Also check for quantity-input custom element
+            const quantityInputs = document.querySelectorAll('quantity-input');
+            quantityInputs.forEach(qInput => {
+                if (qInput.style.display !== 'none') {
+                    qInput.style.display = 'none';
+                    // Also ensure the input inside is set to 1
+                    const input = qInput.querySelector('input[name="quantity"]');
+                    if (input) {
+                        input.value = '1';
+                    }
+                    console.log('Hidden dynamically loaded quantity-input element');
+                }
+            });
+            
+            // Hide any visible quantity buttons
+            const quantityButtons = document.querySelectorAll('.quantity__button:not([style*="display: none"])');
+            quantityButtons.forEach(button => {
+                button.style.display = 'none';
+            });
         });
         
         quantityObserver.observe(document.body, {
@@ -565,8 +606,19 @@
         const buyNowButton = document.getElementById('BuyNowButton');
         if (buyNowButton) {
             buyNowButton.disabled = true;
+            buyNowButton.setAttribute('disabled', 'disabled');
             buyNowButton.style.opacity = '0.5';
             buyNowButton.style.cursor = 'not-allowed';
+            buyNowButton.style.pointerEvents = 'none';
+            
+            // Add click prevention
+            buyNowButton.onclick = function(e) {
+                if (!selectedDate || !selectedTime) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            };
         }
     }
     
@@ -578,8 +630,13 @@
             
             if (buyNowButton) {
                 buyNowButton.disabled = false;
+                buyNowButton.removeAttribute('disabled');
                 buyNowButton.style.opacity = '1';
                 buyNowButton.style.cursor = 'pointer';
+                buyNowButton.style.pointerEvents = 'auto';
+                
+                // Remove click prevention
+                buyNowButton.onclick = null;
             }
         }
     }
