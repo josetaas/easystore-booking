@@ -46,6 +46,9 @@
         // Hide Add to Cart button
         hideAddToCartButton();
         
+        // Hide and set quantity
+        hideAndSetQuantity();
+        
         createBookingWidget(buyNowButton);
         addCustomStyles();
         disableBuyNowButton();
@@ -453,6 +456,58 @@
             selectedTime = null;
             disableBuyNowButton();
             document.getElementById('booking-summary').style.display = 'none';
+        });
+    }
+    
+    // Hide and set quantity input
+    function hideAndSetQuantity() {
+        const quantityInput = document.getElementById('Quantity');
+        if (quantityInput) {
+            quantityInput.value = '1';
+            quantityInput.style.display = 'none';
+            
+            // Also hide the quantity container/wrapper if it exists
+            const quantityContainer = quantityInput.closest('.product-form__quantity') || 
+                                    quantityInput.closest('.quantity-selector') ||
+                                    quantityInput.closest('.quantity');
+            if (quantityContainer) {
+                quantityContainer.style.display = 'none';
+            }
+            
+            // Hide any label associated with quantity
+            const quantityLabel = document.querySelector('label[for="Quantity"]');
+            if (quantityLabel) {
+                quantityLabel.style.display = 'none';
+            }
+            
+            console.log('Hidden quantity input and set to 1');
+        }
+        
+        // Also hide quantity buttons if they exist
+        const quantityButtons = document.querySelectorAll('.quantity-button, .quantity__button, [data-quantity-button]');
+        quantityButtons.forEach(button => {
+            button.style.display = 'none';
+        });
+        
+        // Watch for dynamically loaded quantity elements
+        const quantityObserver = new MutationObserver((mutations) => {
+            const quantity = document.getElementById('Quantity');
+            if (quantity && quantity.style.display !== 'none') {
+                quantity.value = '1';
+                quantity.style.display = 'none';
+                const container = quantity.closest('.product-form__quantity') || 
+                                quantity.closest('.quantity-selector') ||
+                                quantity.closest('.quantity');
+                if (container) {
+                    container.style.display = 'none';
+                }
+                console.log('Hidden dynamically loaded quantity input');
+            }
+        });
+        
+        quantityObserver.observe(document.body, {
+            childList: true,
+            subtree: true
         });
     }
     
