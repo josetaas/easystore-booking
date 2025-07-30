@@ -249,20 +249,30 @@
             const dateStr = date.toISOString().split('T')[0];
             let availableSlots = availabilityCache[dateStr];
             
-            if (!availableSlots) {
+            if (!availableSlots || !businessHours) {
+                console.log('Fetching availability for date:', dateStr);
                 const response = await fetch(`${CONFIG.availabilityEndpoint}?date=${dateStr}`);
                 const data = await response.json();
-                availableSlots = data.slots;
+                console.log('API response:', data);
+                
+                availableSlots = data.slots || [];
                 
                 // Store business hours from API if not already stored
-                if (!businessHours && data.businessHours) {
+                if (data.businessHours) {
                     businessHours = data.businessHours;
+                    console.log('Loaded business hours from API:', businessHours);
                 }
             }
             
             // Get business hours for this day
             const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+            
+            // Debug logging
+            console.log('Business hours object:', businessHours);
+            console.log('Day name:', dayName);
+            
             const dayBusinessHours = businessHours ? businessHours[dayName] || [] : [];
+            console.log('Business hours for', dayName, ':', dayBusinessHours);
             
             if (dayBusinessHours.length === 0) {
                 timeSlotsContainer.innerHTML = '<div class="no-slots">Sorry, we\'re closed on this day.</div>';
