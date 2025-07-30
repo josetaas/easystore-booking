@@ -645,8 +645,13 @@
                         console.log('Clearing cart before booking...');
                         
                         // First retrieve the current cart
-                        window.EasyStore.Action.retrieveCart(function(cart) {
+                        window.EasyStore.Action.retrieveCart(function(response) {
+                            // Cart data is nested in response.cart
+                            const cart = response && response.cart ? response.cart : response;
+                            
                             if (cart && cart.items && cart.items.length > 0) {
+                                console.log('Found ' + cart.items.length + ' items in cart, removing...');
+                                
                                 // Remove each item from the cart
                                 let itemsToRemove = cart.items.length;
                                 let itemsRemoved = 0;
@@ -655,24 +660,26 @@
                                     window.EasyStore.Action.removeCartItem({
                                         id: item.id,
                                         quantity: item.quantity
-                                    }, function(response) {
+                                    }, function(removeResponse) {
                                         itemsRemoved++;
                                         console.log('Removed item from cart:', item.id);
                                         
                                         // When all items are removed, submit the form
                                         if (itemsRemoved === itemsToRemove) {
                                             console.log('Cart cleared, submitting booking...');
-                                            // Find the form and submit it
-                                            const form = buyNowButton.closest('form');
-                                            if (form) {
-                                                form.submit();
-                                            }
+                                            // Small delay to ensure cart is updated
+                                            setTimeout(function() {
+                                                const form = buyNowButton.closest('form');
+                                                if (form) {
+                                                    form.submit();
+                                                }
+                                            }, 100);
                                         }
                                     });
                                 });
                             } else {
                                 // Cart is already empty, proceed with submission
-                                console.log('Cart is empty, submitting booking...');
+                                console.log('Cart is already empty, submitting booking...');
                                 const form = buyNowButton.closest('form');
                                 if (form) {
                                     form.submit();
