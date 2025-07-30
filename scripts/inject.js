@@ -40,6 +40,9 @@
             return;
         }
         
+        // Hide Add to Cart button
+        hideAddToCartButton();
+        
         createBookingWidget(buyNowButton);
         addCustomStyles();
         disableBuyNowButton();
@@ -156,7 +159,9 @@
                 } else {
                     dayElement.classList.add('available-date');
                     const dateStr = currentDate.toISOString().split('T')[0];
-                    dayElement.addEventListener('click', () => {
+                    dayElement.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         // Create date from string to avoid timezone issues
                         const [year, month, day] = dateStr.split('-');
                         const selectedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -303,7 +308,11 @@
                 if (isAvailable) {
                     hasAvailableSlots = true;
                     slotButton.classList.add('available');
-                    slotButton.addEventListener('click', () => selectTime(time));
+                    slotButton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        selectTime(time, e);
+                    });
                 } else {
                     slotButton.classList.add('booked');
                     slotButton.disabled = true;
@@ -326,14 +335,16 @@
     }
     
     // Handle time selection
-    function selectTime(time) {
+    function selectTime(time, event) {
         selectedTime = time;
         
         // Highlight selected time
         document.querySelectorAll('.time-slot').forEach(slot => {
             slot.classList.remove('selected');
         });
-        event.target.classList.add('selected');
+        if (event && event.target) {
+            event.target.classList.add('selected');
+        }
         
         // Update booking summary
         updateBookingSummary();
@@ -395,7 +406,9 @@
     // Set up event listeners
     function setupEventListeners() {
         // Calendar navigation
-        document.getElementById('prev-month').addEventListener('click', () => {
+        document.getElementById('prev-month').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const currentMonth = document.getElementById('current-month').textContent;
             const [monthName, year] = currentMonth.split(' ');
             const monthIndex = ["January", "February", "March", "April", "May", "June",
@@ -404,7 +417,9 @@
             displayCalendar(newDate);
         });
         
-        document.getElementById('next-month').addEventListener('click', () => {
+        document.getElementById('next-month').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const currentMonth = document.getElementById('current-month').textContent;
             const [monthName, year] = currentMonth.split(' ');
             const monthIndex = ["January", "February", "March", "April", "May", "June",
@@ -414,12 +429,49 @@
         });
         
         // Change date button
-        document.getElementById('change-date').addEventListener('click', () => {
+        document.getElementById('change-date').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             document.getElementById('time-selection').style.display = 'none';
             document.getElementById('date-selection').style.display = 'block';
             selectedTime = null;
             disableBuyNowButton();
             document.getElementById('booking-summary').style.display = 'none';
+        });
+    }
+    
+    // Hide Add to Cart button
+    function hideAddToCartButton() {
+        // Try multiple selectors that EasyStore might use
+        const addToCartSelectors = [
+            '#AddToCart',
+            '#AddToCartButton',
+            'button[name="add"]',
+            'input[name="add"]',
+            'button[type="submit"]:not(#BuyNowButton)',
+            '.product-form__cart-submit:not(#BuyNowButton)',
+            '.btn--add-to-cart'
+        ];
+        
+        addToCartSelectors.forEach(selector => {
+            const buttons = document.querySelectorAll(selector);
+            buttons.forEach(button => {
+                // Make sure we're not hiding the Buy Now button
+                if (button.id !== 'BuyNowButton' && !button.classList.contains('buy-now')) {
+                    button.style.display = 'none';
+                    console.log('Hidden button:', selector);
+                }
+            });
+        });
+        
+        // Also hide any parent containers that might only contain the Add to Cart button
+        const cartButtons = document.querySelectorAll('.product-form__buttons');
+        cartButtons.forEach(container => {
+            const hasOnlyAddToCart = container.children.length === 1 && 
+                                    !container.querySelector('#BuyNowButton');
+            if (hasOnlyAddToCart) {
+                container.style.display = 'none';
+            }
         });
     }
     
@@ -686,6 +738,11 @@
                 border-radius: 3px;
                 overflow: hidden;
                 background: #fafafa;
+            }
+            
+            /* Prevent form submission from widget clicks */
+            #booking-widget button:not(#BuyNowButton) {
+                type: button !important;
             }
         `;
         document.head.appendChild(style);
