@@ -226,7 +226,10 @@
         document.querySelectorAll('.calendar-day').forEach(day => {
             day.classList.remove('selected');
         });
-        document.querySelector(`[data-date="${dateStr}"]`).classList.add('selected');
+        const selectedDay = document.querySelector(`[data-date="${dateStr}"]`);
+        if (selectedDay) {
+            selectedDay.classList.add('selected');
+        }
         
         // Load time slots
         await loadTimeSlots(date);
@@ -440,177 +443,198 @@
         const style = document.createElement('style');
         style.textContent = `
             .booking-widget-container {
-                background: #f9f9f9;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                padding: 20px;
+                background: #ffffff;
+                border: 1px solid #e5e5e5;
+                border-radius: 4px;
+                padding: 24px;
                 margin: 20px 0;
-                font-family: Arial, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             }
             
             .booking-title {
-                color: #333;
-                margin-bottom: 20px;
+                color: #1a1a1a;
+                margin-bottom: 24px;
                 text-align: center;
+                font-size: 18px;
+                font-weight: 500;
             }
             
             .booking-step h4 {
-                color: #555;
-                margin-bottom: 15px;
+                color: #666;
+                margin-bottom: 16px;
+                font-size: 14px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             
             .calendar-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                margin-bottom: 15px;
+                margin-bottom: 20px;
             }
             
             .nav-button {
-                background: #007cba;
-                color: white;
-                border: none;
-                padding: 8px 12px;
-                border-radius: 4px;
+                background: transparent;
+                color: #666;
+                border: 1px solid #e5e5e5;
+                padding: 6px 12px;
+                border-radius: 3px;
                 cursor: pointer;
+                font-size: 16px;
+                transition: all 0.2s ease;
             }
             
             .nav-button:hover {
-                background: #005a87;
+                background: #f5f5f5;
+                border-color: #ccc;
             }
             
             #current-month {
-                font-weight: bold;
-                font-size: 18px;
+                font-weight: 500;
+                font-size: 16px;
+                color: #1a1a1a;
             }
             
             .calendar-row {
                 display: grid;
                 grid-template-columns: repeat(7, 1fr);
-                gap: 2px;
-                margin-bottom: 2px;
+                gap: 1px;
+                margin-bottom: 1px;
             }
             
             .calendar-day-header {
                 text-align: center;
-                font-weight: bold;
-                padding: 8px;
-                background: #eee;
-                font-size: 12px;
+                font-weight: 500;
+                padding: 8px 4px;
+                font-size: 11px;
+                color: #999;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             
             .calendar-day {
                 text-align: center;
-                padding: 12px 8px;
-                border: 1px solid #eee;
+                padding: 10px 4px;
                 background: white;
                 cursor: pointer;
-                min-height: 20px;
+                min-height: 36px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                font-size: 14px;
+                color: #333;
+                transition: all 0.15s ease;
+                border: 1px solid transparent;
             }
             
             .calendar-day.other-month {
-                color: #ccc;
-                background: #f5f5f5;
+                color: #ddd;
+                background: #fafafa;
                 cursor: default;
             }
             
             .calendar-day.disabled {
-                color: #ccc;
-                background: #f0f0f0;
+                color: #ddd;
+                background: #fafafa;
                 cursor: not-allowed;
             }
             
             .calendar-day.has-availability {
-                background: #e8f5e8;
-                border-color: #4CAF50;
+                background: #f0f9f0;
+                color: #2e7d2e;
             }
             
             .calendar-day.has-availability:hover {
-                background: #d4edda;
+                background: #e1f5e1;
+                border-color: #4CAF50;
             }
             
             .calendar-day.fully-booked {
-                background: #ffe6e6;
-                border-color: #f44336;
+                background: #fef0f0;
+                color: #d32f2f;
                 cursor: not-allowed;
             }
             
             .calendar-day.selected {
-                background: #007cba !important;
+                background: #1a1a1a !important;
                 color: white;
-                font-weight: bold;
+                border-color: #1a1a1a;
             }
             
             #time-slots {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                gap: 10px;
-                margin: 15px 0;
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                gap: 8px;
+                margin: 16px 0;
             }
             
             .time-slot {
-                padding: 12px 16px;
-                border: 2px solid #ddd;
+                padding: 10px 12px;
+                border: 1px solid #e5e5e5;
                 background: white;
-                border-radius: 6px;
+                border-radius: 3px;
                 cursor: pointer;
                 font-size: 14px;
-                transition: all 0.2s;
+                transition: all 0.15s ease;
+                text-align: center;
             }
             
             .time-slot.available:hover {
-                border-color: #007cba;
-                background: #f0f8ff;
+                border-color: #666;
+                background: #f5f5f5;
             }
             
             .time-slot.selected {
-                background: #007cba;
+                background: #1a1a1a;
                 color: white;
-                border-color: #005a87;
+                border-color: #1a1a1a;
             }
             
             .time-slot.booked {
-                background: #f5f5f5;
-                color: #999;
+                background: #fafafa;
+                color: #ccc;
                 cursor: not-allowed;
-                border-color: #ccc;
+                border-color: #f0f0f0;
             }
             
             .secondary-button {
-                background: #6c757d;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 4px;
+                background: transparent;
+                color: #666;
+                border: 1px solid #e5e5e5;
+                padding: 8px 16px;
+                border-radius: 3px;
                 cursor: pointer;
-                margin-top: 15px;
+                margin-top: 16px;
+                font-size: 14px;
+                transition: all 0.15s ease;
             }
             
             .secondary-button:hover {
-                background: #545b62;
+                background: #f5f5f5;
+                border-color: #ccc;
             }
             
             .booking-summary {
-                background: #e8f5e8;
-                border: 1px solid #4CAF50;
-                border-radius: 6px;
-                padding: 15px;
+                background: #f5f5f5;
+                border: 1px solid #e5e5e5;
+                border-radius: 3px;
+                padding: 16px;
                 margin-top: 20px;
             }
             
             .booking-detail {
-                margin: 5px 0;
-                font-size: 16px;
+                margin: 6px 0;
+                font-size: 14px;
+                color: #333;
             }
             
             .loading-indicator, .loading, .error, .no-slots {
                 text-align: center;
                 padding: 20px;
-                color: #666;
-                font-style: italic;
+                color: #999;
+                font-size: 14px;
             }
             
             .error {
@@ -622,17 +646,26 @@
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                background: rgba(0, 0, 0, 0.8);
+                background: rgba(0, 0, 0, 0.85);
                 color: white;
-                padding: 10px 15px;
-                border-radius: 4px;
-                font-size: 14px;
+                padding: 8px 12px;
+                border-radius: 3px;
+                font-size: 13px;
                 pointer-events: none;
                 z-index: 10;
+                white-space: nowrap;
             }
             
             #BuyNowButton {
                 position: relative;
+            }
+            
+            /* Calendar grid styling */
+            #calendar-grid {
+                border: 1px solid #e5e5e5;
+                border-radius: 3px;
+                overflow: hidden;
+                background: #fafafa;
             }
         `;
         document.head.appendChild(style);
