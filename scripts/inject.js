@@ -155,7 +155,13 @@
                     dayElement.classList.add('disabled');
                 } else {
                     dayElement.classList.add('available-date');
-                    dayElement.addEventListener('click', () => selectDate(new Date(currentDate)));
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    dayElement.addEventListener('click', () => {
+                        // Create date from string to avoid timezone issues
+                        const [year, month, day] = dateStr.split('-');
+                        const selectedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        selectDate(selectedDate);
+                    });
                 }
                 
                 dayElement.textContent = currentDate.getDate();
@@ -184,9 +190,10 @@
             const response = await fetch(`${CONFIG.availabilityEndpoint}?start=${startDate.toISOString().split('T')[0]}&end=${endDate.toISOString().split('T')[0]}`);
             const availability = await response.json();
             
-            // Store business hours from API if not already stored
-            if (!businessHours && availability.businessHours) {
+            // Store business hours from API
+            if (availability.businessHours) {
                 businessHours = availability.businessHours;
+                console.log('Stored business hours from month view:', businessHours);
             }
             
             // Update calendar with availability
@@ -267,12 +274,15 @@
             // Get business hours for this day
             const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
             
-            // Debug logging
-            console.log('Business hours object:', businessHours);
-            console.log('Day name:', dayName);
+            // Debug - check if businessHours exists
+            if (!businessHours) {
+                console.error('Business hours not loaded! This should not happen.');
+                timeSlotsContainer.innerHTML = '<div class="error">Error: Business hours not loaded. Please refresh and try again.</div>';
+                return;
+            }
             
-            const dayBusinessHours = businessHours ? businessHours[dayName] || [] : [];
-            console.log('Business hours for', dayName, ':', dayBusinessHours);
+            const dayBusinessHours = businessHours[dayName] || [];
+            console.log(`Time slots for ${dayName}:`, dayBusinessHours);
             
             if (dayBusinessHours.length === 0) {
                 timeSlotsContainer.innerHTML = '<div class="no-slots">Sorry, we\'re closed on this day.</div>';
