@@ -168,10 +168,6 @@ Add the script tag to your EasyStore theme's `<head>` section or before the clos
 - Consider implementing rate limiting for production
 - Add authentication if API will be publicly accessible
 
-## License
-
-[Your chosen license]
-
 ## Support
 
 For issues or questions, please [create an issue](https://github.com/[username]/[repo]/issues) on GitHub.
