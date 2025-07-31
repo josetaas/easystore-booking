@@ -7,6 +7,7 @@ const express = require('express');
 const { google } = require('googleapis');
 const cors = require('cors');
 const path = require('path');
+const dataAccess = require('./lib/data-access');
 
 const app = express();
 app.use(cors());
@@ -316,10 +317,12 @@ async function getAvailabilityForDateRange(startDateStr, endDateStr, productName
 // API Routes
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    const dbHealthy = await dataAccess.healthCheck();
     res.json({ 
         status: 'healthy', 
         calendar: calendar ? 'connected' : 'disconnected',
+        database: dbHealthy ? 'connected' : 'disconnected',
         timestamp: new Date().toISOString()
     });
 });
@@ -465,20 +468,45 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Sync status endpoint
+app.get('/api/sync-status', async (req, res) => {
+    try {
+        const status = await dataAccess.getSyncStatus();
+        res.json({
+            success: true,
+            ...status
+        });
+    } catch (error) {
+        console.error('Error fetching sync status:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch sync status',
+            message: error.message
+        });
+    }
+});
+
 // Initialize and start server
 async function startServer() {
     try {
+        // Initialize database
+        console.log('🔄 Initializing database...');
+        await dataAccess.initialize();
+        
+        // Initialize Google Calendar
         await initGoogleCalendar();
         
         const PORT = process.env.PORT || 3000;
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
             console.log(`📅 Calendar integration active`);
+            console.log(`💾 Database connected`);
             console.log(`🌐 API endpoints:`);
             console.log(`   GET  /api/availability?date=YYYY-MM-DD`);
             console.log(`   GET  /api/availability?start=YYYY-MM-DD&end=YYYY-MM-DD`);
             console.log(`   POST /api/booking/create`);
             console.log(`   GET  /api/bookings`);
+            console.log(`   GET  /api/sync-status`);
             console.log(`   GET  /health`);
         });
         
@@ -489,3 +517,16 @@ async function startServer() {
 }
 
 startServer();
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('\n🛑 Shutting down gracefully...');
+    await dataAccess.close();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\n🛑 Shutting down gracefully...');
+    await dataAccess.close();
+    process.exit(0);
+});

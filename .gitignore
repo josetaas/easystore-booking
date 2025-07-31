@@ -63,6 +63,13 @@ credentials.json
 # Backup files
 *.bak
 *.backup
+backups/
+
+# Database files
+data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Lock files (keep package-lock.json)
 yarn.lock
