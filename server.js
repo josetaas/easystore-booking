@@ -163,10 +163,22 @@ async function getCalendarEvents(startDate, endDate) {
     }
 }
 
-// Check if a time slot conflicts with existing events
-function hasConflict(slotStart, slotEnd, events) {
+// Check if a time slot conflicts with existing events for a specific product
+function hasConflict(slotStart, slotEnd, events, productName = null) {
     return events.some(event => {
         if (!event.start || !event.end) return false;
+        
+        // If productName is specified, only check conflicts with same product
+        if (productName && event.summary) {
+            // Extract product name from event title (format: "Product Name - Customer Name")
+            const eventProductMatch = event.summary.match(/^(.+?)\s*-\s*/);
+            const eventProductName = eventProductMatch ? eventProductMatch[1].trim() : event.summary.trim();
+            
+            // Check for exact match (case insensitive)
+            if (eventProductName.toLowerCase() !== productName.toLowerCase()) {
+                return false; // Different product, no conflict
+            }
+        }
         
         const eventStart = new Date(event.start.dateTime || event.start.date);
         const eventEnd = new Date(event.end.dateTime || event.end.date);
@@ -177,7 +189,7 @@ function hasConflict(slotStart, slotEnd, events) {
 }
 
 // Get available time slots for a specific date
-async function getAvailableSlots(dateStr) {
+async function getAvailableSlots(dateStr, productName = null) {
     try {
         const date = new Date(dateStr);
         const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
@@ -203,8 +215,8 @@ async function getAvailableSlots(dateStr) {
             const slotStart = createDateTime(dateStr, timeSlot);
             const slotEnd = new Date(slotStart.getTime() + (CONFIG.sessionDuration + CONFIG.bufferTime) * 60000);
             
-            // Check if this slot conflicts with any existing events
-            if (!hasConflict(slotStart, slotEnd, events)) {
+            // Check if this slot conflicts with any existing events for this product
+            if (!hasConflict(slotStart, slotEnd, events, productName)) {
                 availableSlots.push(timeSlot);
             }
         }
@@ -218,7 +230,7 @@ async function getAvailableSlots(dateStr) {
 }
 
 // Get availability for multiple dates
-async function getAvailabilityForDateRange(startDateStr, endDateStr) {
+async function getAvailabilityForDateRange(startDateStr, endDateStr, productName = null) {
     try {
         const startDate = new Date(startDateStr);
         const endDate = new Date(endDateStr);
@@ -267,7 +279,7 @@ async function getAvailabilityForDateRange(startDateStr, endDateStr) {
                     const slotStart = createDateTime(dateStr, timeSlot);
                     const slotEnd = new Date(slotStart.getTime() + (CONFIG.sessionDuration + CONFIG.bufferTime) * 60000);
                     
-                    if (!hasConflict(slotStart, slotEnd, dayEvents)) {
+                    if (!hasConflict(slotStart, slotEnd, dayEvents, productName)) {
                         availableSlots.push(timeSlot);
                     }
                 }
@@ -304,23 +316,25 @@ app.get('/health', (req, res) => {
 // Get availability for date range or specific date
 app.get('/api/availability', async (req, res) => {
     try {
-        const { start, end, date } = req.query;
+        const { start, end, date, product } = req.query;
         
         if (date) {
             // Single date request
-            const slots = await getAvailableSlots(date);
+            const slots = await getAvailableSlots(date, product);
             res.json({
                 date,
                 available: slots.length > 0,
                 slots,
-                businessHours: CONFIG.businessHours
+                businessHours: CONFIG.businessHours,
+                product: product || null
             });
         } else if (start && end) {
             // Date range request
-            const dates = await getAvailabilityForDateRange(start, end);
+            const dates = await getAvailabilityForDateRange(start, end, product);
             res.json({ 
                 dates,
-                businessHours: CONFIG.businessHours 
+                businessHours: CONFIG.businessHours,
+                product: product || null
             });
         } else {
             res.status(400).json({ 
@@ -340,7 +354,7 @@ app.get('/api/availability', async (req, res) => {
 // Create a calendar event (for testing)
 app.post('/api/booking/create', async (req, res) => {
     try {
-        const { date, time, customerName, customerEmail, sessionType = 'Photography Session' } = req.body;
+        const { date, time, customerName, customerEmail, productName, sessionType = 'Photography Session' } = req.body;
         
         if (!date || !time || !customerName || !customerEmail) {
             return res.status(400).json({ 
@@ -351,9 +365,14 @@ app.post('/api/booking/create', async (req, res) => {
         const startDateTime = createDateTime(date, time);
         const endDateTime = new Date(startDateTime.getTime() + CONFIG.sessionDuration * 60000);
         
+        // Include product name in the event title if provided
+        const eventTitle = productName 
+            ? `${productName} - ${customerName}`
+            : `${sessionType} - ${customerName}`;
+        
         const event = {
-            summary: `${sessionType} - ${customerName}`,
-            description: `Photography session booking\nCustomer: ${customerName}\nEmail: ${customerEmail}`,
+            summary: eventTitle,
+            description: `Photography session booking\nCustomer: ${customerName}\nEmail: ${customerEmail}${productName ? `\nProduct: ${productName}` : ''}`,
             start: {
                 dateTime: startDateTime.toISOString(),
                 timeZone: CONFIG.timezone

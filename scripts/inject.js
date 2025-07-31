@@ -24,6 +24,7 @@
     let selectedTime = null;
     let availabilityCache = {};
     let businessHours = null; // Will be populated from API
+    let productName = null; // Will be detected from page
     
     // Wait for DOM to be ready
     function ready(fn) {
@@ -34,6 +35,29 @@
         }
     }
     
+    // Detect product name from the page
+    function detectProductName() {
+        // Try multiple selectors common in EasyStore
+        const selectors = [
+            'h1.product__title',
+            '.product__title',
+            'h1.product-single__title',
+            '.product-single__title',
+            'h1[itemprop="name"]',
+            '[data-product-title]',
+            'h1'
+        ];
+        
+        for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element && element.textContent) {
+                return element.textContent.trim();
+            }
+        }
+        
+        return null;
+    }
+    
     // Initialize the booking widget
     function initBookingWidget() {
         const buyNowButton = document.getElementById('BuyNowButton');
@@ -42,6 +66,10 @@
             setTimeout(initBookingWidget, 1000);
             return;
         }
+        
+        // Detect product name
+        productName = detectProductName();
+        console.log('Detected product name:', productName);
         
         // Disable buy now button immediately
         buyNowButton.disabled = true;
@@ -226,7 +254,13 @@
             const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
             const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
             
-            const response = await fetch(`${CONFIG.availabilityEndpoint}?start=${startDate.toISOString().split('T')[0]}&end=${endDate.toISOString().split('T')[0]}`);
+            const url = new URL(CONFIG.availabilityEndpoint);
+            url.searchParams.append('start', startDate.toISOString().split('T')[0]);
+            url.searchParams.append('end', endDate.toISOString().split('T')[0]);
+            if (productName) {
+                url.searchParams.append('product', productName);
+            }
+            const response = await fetch(url.toString());
             const availability = await response.json();
             
             // Store business hours from API
@@ -321,7 +355,12 @@
             
             if (!availableSlots || !businessHours) {
                 console.log('Fetching availability for date:', dateStr);
-                const response = await fetch(`${CONFIG.availabilityEndpoint}?date=${dateStr}`);
+                const url = new URL(CONFIG.availabilityEndpoint);
+                url.searchParams.append('date', dateStr);
+                if (productName) {
+                    url.searchParams.append('product', productName);
+                }
+                const response = await fetch(url.toString());
                 const data = await response.json();
                 console.log('API response:', data);
                 
@@ -445,6 +484,7 @@
         // Add hidden inputs for booking details to the form
         let bookingDateInput = form.querySelector('input[name="properties[Booking Date]"]');
         let bookingTimeInput = form.querySelector('input[name="properties[Booking Time]"]');
+        let bookingProductInput = form.querySelector('input[name="properties[Booking Product]"]');
         
         if (!bookingDateInput) {
             bookingDateInput = document.createElement('input');
@@ -460,8 +500,18 @@
             form.appendChild(bookingTimeInput);
         }
         
+        if (!bookingProductInput && productName) {
+            bookingProductInput = document.createElement('input');
+            bookingProductInput.type = 'hidden';
+            bookingProductInput.name = 'properties[Booking Product]';
+            form.appendChild(bookingProductInput);
+        }
+        
         bookingDateInput.value = selectedDate;
         bookingTimeInput.value = selectedTime;
+        if (bookingProductInput && productName) {
+            bookingProductInput.value = productName;
+        }
     }
     
     // Set up event listeners
