@@ -16,8 +16,8 @@
         // How many days ahead to show bookings
         daysAhead: 30,
         
-        // Minimum days ahead for booking (e.g., 2 = can't book same day or next day)
-        minDaysAhead: 2
+        // Minimum days ahead for booking (e.g., 0 = can book same day, 1 = can't book same day)
+        minDaysAhead: 1
     };
     
     let selectedDate = null;
@@ -68,7 +68,6 @@
         bookingContainer.innerHTML = `
             <div class="booking-widget-container">
                 <div class="booking-step" id="date-selection">
-                    <h4>Choose a Date</h4>
                     <div id="calendar-container">
                         <div class="calendar-header">
                             <button id="prev-month" class="nav-button">
@@ -86,12 +85,12 @@
                         <div id="calendar-grid"></div>
                     </div>
                     <div id="availability-loading" class="loading-indicator" style="display: none;">
-                        Checking availability...
+                        <div class="spinner"></div>
+                        <div>Checking availability...</div>
                     </div>
                 </div>
                 
                 <div class="booking-step" id="time-selection" style="display: none;">
-                    <h4>Choose a Time</h4>
                     <div id="time-slots"></div>
                     <button id="change-date" class="secondary-button">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,7 +172,10 @@
                 dayElement.className = 'calendar-day';
                 
                 const isCurrentMonth = currentDate.getMonth() === date.getMonth();
-                const isPastDate = currentDate < minBookingDate;
+                // Compare dates at start of day to allow same-day bookings
+                const currentDateStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+                const minDateStart = new Date(minBookingDate.getFullYear(), minBookingDate.getMonth(), minBookingDate.getDate());
+                const isPastDate = currentDateStart < minDateStart;
                 const isTooFarAhead = currentDate > new Date(today.getFullYear(), today.getMonth(), today.getDate() + CONFIG.daysAhead);
                 
                 if (!isCurrentMonth) {
@@ -193,7 +195,16 @@
                 }
                 
                 dayElement.textContent = currentDate.getDate();
-                dayElement.dataset.date = currentDate.toISOString().split('T')[0];
+                // Format date in local timezone to avoid UTC shift
+                const year = currentDate.getFullYear();
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const day = String(currentDate.getDate()).padStart(2, '0');
+                const localDateStr = `${year}-${month}-${day}`;
+                dayElement.dataset.date = localDateStr;
+                
+                // Debug: Add day name as title
+                const debugDayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][currentDate.getDay()];
+                dayElement.title = `${localDateStr} (${debugDayName})`;
                 
                 row.appendChild(dayElement);
                 currentDate.setDate(currentDate.getDate() + 1);
@@ -228,10 +239,26 @@
             availability.dates.forEach(dateInfo => {
                 const dayElement = document.querySelector(`[data-date="${dateInfo.date}"]`);
                 if (dayElement && dayElement.classList.contains('available-date')) {
-                    if (dateInfo.available) {
+                    // Debug log
+                    const [year, month, day] = dateInfo.date.split('-').map(Number);
+                    const checkDate = new Date(year, month - 1, day);
+                    const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][checkDate.getDay()];
+                    console.log(`Processing ${dateInfo.date} (${dayName}): available=${dateInfo.available}, slots=${dateInfo.slots?.length || 0}`);
+                    
+                    if (dateInfo.available && dateInfo.slots && dateInfo.slots.length > 0) {
+                        // Has availability
                         dayElement.classList.add('has-availability');
-                    } else {
-                        dayElement.classList.add('fully-booked');
+                    } else if (!dateInfo.available || (dateInfo.slots && dateInfo.slots.length === 0)) {
+                        // Not available - check if closed or booked
+                        const dayBusinessHours = businessHours[dayName] || [];
+                        
+                        if (dayBusinessHours.length === 0) {
+                            // We're closed this day
+                            dayElement.classList.add('closed-day');
+                        } else {
+                            // We have hours but no availability - actually booked
+                            dayElement.classList.add('fully-booked');
+                        }
                     }
                 }
             });
@@ -254,7 +281,11 @@
     
     // Handle date selection
     async function selectDate(date) {
-        const dateStr = date.toISOString().split('T')[0];
+        // Format date in local timezone to avoid UTC shift
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         selectedDate = dateStr;
         
         // Highlight selected date
@@ -281,7 +312,11 @@
         
         try {
             // Get availability from cache or API
-            const dateStr = date.toISOString().split('T')[0];
+            // Format date in local timezone to avoid UTC shift
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
             let availableSlots = availabilityCache[dateStr];
             
             if (!availableSlots || !businessHours) {
@@ -833,13 +868,8 @@
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             }
             
-            .booking-step h4 {
-                color: #1a1a1a;
-                margin-bottom: 20px;
-                font-size: 16px;
-                font-weight: 600;
-                text-transform: none;
-                letter-spacing: normal;
+            .booking-step {
+                padding-top: 0;
             }
             
             .calendar-header {
@@ -921,11 +951,13 @@
             }
             
             .calendar-day.has-availability {
-                color: #1a1a1a;
+                color: #333;
+                font-weight: normal;
             }
             
             .calendar-day.has-availability:hover {
                 background: #f5f5f5;
+                cursor: pointer;
             }
             
             .calendar-day.fully-booked {
@@ -934,8 +966,14 @@
                 text-decoration: line-through;
             }
             
+            .calendar-day.closed-day {
+                color: #ccc;
+                cursor: not-allowed;
+                /* No strikethrough for closed days */
+            }
+            
             .calendar-day.selected {
-                background: #0066ff !important;
+                background: #ff6b35 !important;
                 color: white;
                 font-weight: 600;
             }
@@ -961,14 +999,14 @@
             }
             
             .time-slot.available:hover {
-                border-color: #0066ff;
-                background: #f0f7ff;
+                border-color: #ff6b35;
+                background: #ffede6;
             }
             
             .time-slot.selected {
-                background: #0066ff;
+                background: #ff6b35;
                 color: white;
-                border-color: #0066ff;
+                border-color: #ff6b35;
             }
             
             .time-slot.booked {
@@ -1000,8 +1038,8 @@
             }
             
             .booking-summary {
-                background: #f0f7ff;
-                border: 2px solid #0066ff;
+                background: #fff5f0;
+                border: 2px solid #ff6b35;
                 border-radius: 10px;
                 padding: 20px;
                 margin-top: 24px;
@@ -1019,6 +1057,28 @@
                 padding: 20px;
                 color: #999;
                 font-size: 14px;
+            }
+            
+            .loading-indicator {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+                padding: 30px;
+            }
+            
+            .spinner {
+                width: 32px;
+                height: 32px;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #ff6b35;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
             }
             
             .error {
@@ -1050,7 +1110,33 @@
         document.head.appendChild(style);
     }
     
+    // Hide cart button
+    function hideCartButton() {
+        const cartButton = document.getElementById('cart-icon-bubble');
+        if (cartButton) {
+            cartButton.style.display = 'none';
+            console.log('Hidden cart button');
+        }
+        
+        // Also check for dynamically loaded cart buttons
+        const observer = new MutationObserver((mutations) => {
+            const cartBtn = document.getElementById('cart-icon-bubble');
+            if (cartBtn && cartBtn.style.display !== 'none') {
+                cartBtn.style.display = 'none';
+                console.log('Hidden dynamically loaded cart button');
+            }
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+    
     // Initialize when ready
-    ready(initBookingWidget);
+    ready(function() {
+        initBookingWidget();
+        hideCartButton();
+    });
     
 })();

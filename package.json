@@ -13,6 +13,7 @@
     "googleapis": "^118.0.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "terser": "^5.43.1"
   }
 }
