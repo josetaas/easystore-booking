@@ -168,6 +168,21 @@ function hasConflict(slotStart, slotEnd, events, productName = null) {
     return events.some(event => {
         if (!event.start || !event.end) return false;
         
+        const eventStart = new Date(event.start.dateTime || event.start.date);
+        const eventEnd = new Date(event.end.dateTime || event.end.date);
+        
+        // Check for time overlap first
+        const hasTimeOverlap = slotStart < eventEnd && slotEnd > eventStart;
+        if (!hasTimeOverlap) return false;
+        
+        // Check if this is a "Closed" event (blocks all products)
+        if (event.summary) {
+            const eventTitle = event.summary.trim().toLowerCase();
+            if (eventTitle === 'closed' || eventTitle.startsWith('closed ') || eventTitle.startsWith('closed:')) {
+                return true; // Closed events block all products
+            }
+        }
+        
         // If productName is specified, only check conflicts with same product
         if (productName && event.summary) {
             // Extract product name from event title (format: "Product Name - Customer Name")
@@ -180,11 +195,7 @@ function hasConflict(slotStart, slotEnd, events, productName = null) {
             }
         }
         
-        const eventStart = new Date(event.start.dateTime || event.start.date);
-        const eventEnd = new Date(event.end.dateTime || event.end.date);
-        
-        // Check for overlap
-        return slotStart < eventEnd && slotEnd > eventStart;
+        return true; // Same product or no product specified
     });
 }
 
