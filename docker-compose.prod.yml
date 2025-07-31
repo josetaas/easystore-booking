@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # Production application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: booking-system-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist database and logs
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Google Calendar credentials
+      - GOOGLE_CLIENT_EMAIL=${GOOGLE_CLIENT_EMAIL}
+      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
+      - CALENDAR_ID=${CALENDAR_ID:-primary}
+      # EasyStore API credentials
+      - EASYSTORE_API_URL=${EASYSTORE_API_URL}
+      - EASYSTORE_ACCESS_TOKEN=${EASYSTORE_ACCESS_TOKEN}
+      - EASYSTORE_STORE_URL=${EASYSTORE_STORE_URL}
+      # Database configuration
+      - DATABASE_URL=sqlite:/app/data/booking.db
+      # Redis configuration
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - booking-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: booking-system-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks:
+      - booking-network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-yourredispassword}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--auth", "${REDIS_PASSWORD:-yourredispassword}", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: booking-system-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - booking-network
+
+  # Backup service (runs daily)
+  backup:
+    image: alpine:latest
+    container_name: booking-system-backup
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+    command: >
+      sh -c "while true; do
+        echo 'Starting backup...';
+        tar -czf /backups/backup-$$(date +%Y%m%d-%H%M%S).tar.gz /data;
+        find /backups -type f -mtime +7 -delete;
+        echo 'Backup completed';
+        sleep 86400;
+      done"
+    restart: always
+    networks:
+      - booking-network
+
+networks:
+  booking-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+  nginx-logs:
+    driver: local

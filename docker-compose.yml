@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: booking-system-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot-reload
+      - ./server.js:/app/server.js
+      - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      # Google Calendar credentials (set in .env file)
+      - GOOGLE_CLIENT_EMAIL=${GOOGLE_CLIENT_EMAIL}
+      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
+      - CALENDAR_ID=${CALENDAR_ID:-primary}
+      # EasyStore API credentials (for future sync implementation)
+      - EASYSTORE_API_URL=${EASYSTORE_API_URL}
+      - EASYSTORE_ACCESS_TOKEN=${EASYSTORE_ACCESS_TOKEN}
+      - EASYSTORE_STORE_URL=${EASYSTORE_STORE_URL}
+      # Database configuration
+      - DATABASE_URL=sqlite:/app/data/booking.db
+    depends_on:
+      - redis
+    networks:
+      - booking-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: booking-system-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - booking-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Nginx reverse proxy (optional, for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: booking-system-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - booking-network
+    profiles:
+      - production
+
+  # Database viewer (for development)
+  adminer:
+    image: adminer:latest
+    container_name: booking-system-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=sqlite
+    networks:
+      - booking-network
+    profiles:
+      - development
+
+networks:
+  booking-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
