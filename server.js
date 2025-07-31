@@ -134,14 +134,22 @@ function minutesToTime(minutes) {
     return `${displayHours}:${mins.toString().padStart(2, '0')} ${period}`;
 }
 
-// Create datetime from date and time
+// Create datetime from date and time in the configured timezone
 function createDateTime(dateStr, timeStr) {
-    const date = new Date(dateStr);
+    // Parse the date string and time
+    const [year, month, day] = dateStr.split('-').map(Number);
     const minutes = timeToMinutes(timeStr);
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     
-    date.setHours(hours, mins, 0, 0);
+    // Create date in the configured timezone by constructing ISO string
+    // This ensures the time is interpreted in the business timezone
+    const isoString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00`;
+    
+    // For Asia/Manila (UTC+8), we need to append the timezone offset
+    // This creates the date in the correct timezone
+    const date = new Date(isoString + '+08:00');
+    
     return date;
 }
 

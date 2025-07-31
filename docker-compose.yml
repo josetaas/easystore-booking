@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Main application service
   app:
@@ -14,8 +12,11 @@ services:
       # Mount source code for hot-reload
       - ./server.js:/app/server.js
       - ./scripts:/app/scripts
+      - ./lib:/app/lib
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
+      # Mount data directory for SQLite database
+      - ./data:/app/data
       # Prevent node_modules from being overwritten
       - /app/node_modules
     environment:
