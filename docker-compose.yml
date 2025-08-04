@@ -19,6 +19,7 @@ services:
       - ./test-database.js:/app/test-database.js
       - ./test-easystore-api.js:/app/test-easystore-api.js
       - ./test-sync-engine.js:/app/test-sync-engine.js
+      - ./test-order-sync.js:/app/test-order-sync.js
       # Mount data directory for SQLite database
       - ./data:/app/data
       # Prevent node_modules from being overwritten
