@@ -15,6 +15,9 @@ services:
       - ./lib:/app/lib
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
+      # Mount test files
+      - ./test-database.js:/app/test-database.js
+      - ./test-easystore-api.js:/app/test-easystore-api.js
       # Mount data directory for SQLite database
       - ./data:/app/data
       # Prevent node_modules from being overwritten
