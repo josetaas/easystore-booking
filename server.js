@@ -8,10 +8,13 @@ const { google } = require('googleapis');
 const cors = require('cors');
 const path = require('path');
 const dataAccess = require('./lib/data-access');
+const syncRoutes = require('./routes/sync');
+const { authenticate, rateLimit, logRequest } = require('./middleware/auth');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(logRequest);
 
 // Serve static files from scripts directory
 app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
@@ -324,7 +327,17 @@ async function getAvailabilityForDateRange(startDateStr, endDateStr, productName
 
 // API Routes
 
-// Health check
+// Mount sync routes with authentication and rate limiting
+app.use('/api', 
+    rateLimit({ 
+        windowMs: 60 * 1000, // 1 minute
+        max: 100 // 100 requests per minute
+    }),
+    authenticate,
+    syncRoutes
+);
+
+// Public health check (no auth required)
 app.get('/health', async (req, res) => {
     const dbHealthy = await dataAccess.healthCheck();
     res.json({ 
