@@ -23,6 +23,7 @@ services:
       - ./test-sync-engine.js:/app/test-sync-engine.js
       - ./test-order-sync.js:/app/test-order-sync.js
       - ./test-api-endpoints.js:/app/test-api-endpoints.js
+      - ./test-scheduler.js:/app/test-scheduler.js
       # Mount data directory for SQLite database
       - ./data:/app/data
       # Prevent node_modules from being overwritten

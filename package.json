@@ -9,7 +9,10 @@
     "test:api": "node test-easystore-api.js",
     "test:sync": "node test-sync-engine.js",
     "test:endpoints": "node test-api-endpoints.js",
+    "test:scheduler": "node test-scheduler.js",
     "sync:order": "node test-sync-engine.js --order",
+    "scheduler:run": "node test-scheduler.js --continuous",
+    "scheduler:status": "node test-scheduler.js --status",
     "db:reset": "rm -f data/booking.db && echo 'Database reset'"
   },
   "dependencies": {
@@ -17,8 +20,9 @@
     "dotenv": "^17.2.1",
     "express": "^4.18.2",
     "googleapis": "^118.0.0",
-    "sqlite3": "^5.1.6",
-    "sqlite": "^5.1.1"
+    "node-cron": "^4.2.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.6"
   },
   "devDependencies": {
     "nodemon": "^2.0.22",

@@ -507,6 +507,9 @@ app.get('/api/sync-status', async (req, res) => {
     }
 });
 
+// Store scheduler instance for cleanup
+let schedulerInstance = null;
+
 // Initialize and start server
 async function startServer() {
     try {
@@ -517,11 +520,25 @@ async function startServer() {
         // Initialize Google Calendar
         await initGoogleCalendar();
         
+        // Initialize scheduler if enabled
+        const { getScheduler } = require('./lib/scheduler');
+        schedulerInstance = getScheduler();
+        
+        if (process.env.SYNC_ENABLED !== 'false') {
+            console.log('🔄 Starting order sync scheduler...');
+            await schedulerInstance.start();
+        } else {
+            console.log('⚠️  Order sync scheduler is disabled');
+        }
+        
         const PORT = process.env.PORT || 3000;
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
             console.log(`📅 Calendar integration active`);
             console.log(`💾 Database connected`);
+            if (process.env.SYNC_ENABLED !== 'false') {
+                console.log(`⏰ Sync scheduler active (interval: ${process.env.SYNC_INTERVAL || '*/5 * * * *'})`);
+            }
             console.log(`🌐 API endpoints:`);
             console.log(`   GET  /api/availability?date=YYYY-MM-DD`);
             console.log(`   GET  /api/availability?start=YYYY-MM-DD&end=YYYY-MM-DD`);
@@ -540,14 +557,26 @@ async function startServer() {
 startServer();
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+async function gracefulShutdown() {
     console.log('\n🛑 Shutting down gracefully...');
-    await dataAccess.close();
-    process.exit(0);
-});
+    
+    try {
+        // Stop scheduler if running
+        if (schedulerInstance) {
+            console.log('Stopping scheduler...');
+            schedulerInstance.stop();
+        }
+        
+        // Close database connection
+        await dataAccess.close();
+        
+        console.log('✅ Shutdown complete');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
+}
 
-process.on('SIGTERM', async () => {
-    console.log('\n🛑 Shutting down gracefully...');
-    await dataAccess.close();
-    process.exit(0);
-});
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
