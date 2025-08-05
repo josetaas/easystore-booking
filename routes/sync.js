@@ -241,6 +241,16 @@ router.get('/sync-status', async (req, res) => {
         const status = await dataAccess.getSyncStatus();
         const metrics = status.metrics || {};
         
+        // Get scheduler status if available
+        let schedulerStatus = null;
+        try {
+            const { getScheduler } = require('../lib/scheduler');
+            const scheduler = getScheduler();
+            schedulerStatus = await scheduler.getStatus();
+        } catch (err) {
+            console.log('Scheduler not available:', err.message);
+        }
+        
         // Calculate sync health
         let syncHealth = 'healthy';
         if (metrics.total_orders > 0) {
@@ -276,7 +286,14 @@ router.get('/sync-status', async (req, res) => {
                 successRate: metrics.total_orders > 0 
                     ? Math.round((metrics.successful_orders / metrics.total_orders) * 100) 
                     : 0
-            }
+            },
+            scheduler: schedulerStatus ? {
+                enabled: schedulerStatus.scheduler.enabled,
+                running: schedulerStatus.scheduler.running,
+                interval: schedulerStatus.scheduler.interval,
+                nextRun: schedulerStatus.scheduler.nextRun,
+                metrics: schedulerStatus.metrics
+            } : null
         });
         
     } catch (error) {
