@@ -1473,16 +1473,94 @@
         }
     };
     
+    // Checkout page modifications
+    const CheckoutModifier = {
+        init() {
+            if (!this.isCheckoutPage()) {
+                return;
+            }
+            
+            console.log('[CheckoutModifier] Checkout page detected, applying modifications...');
+            this.modifyPickupOptions();
+            this.hidePickupSection();
+        },
+        
+        isCheckoutPage() {
+            const path = window.location.pathname;
+            return path.includes('/checkout/') || path.includes('/sf/checkout/');
+        },
+        
+        modifyPickupOptions() {
+            // Select "I will pick up the order" option
+            const selfCollectRadio = document.querySelector('input[name="checkout[pickup_address][is_self_collect]"][value="true"]');
+            if (selfCollectRadio) {
+                selfCollectRadio.checked = true;
+                console.log('[CheckoutModifier] Self collect option selected');
+            }
+            
+            // Hide the pickup options card
+            // Find the card containing the pickup options
+            const pickupInputs = document.querySelectorAll('input[name="checkout[pickup_address][is_self_collect]"]');
+            pickupInputs.forEach(input => {
+                // Find parent card element
+                let card = input.closest('.card');
+                if (card) {
+                    card.style.display = 'none';
+                    console.log('[CheckoutModifier] Pickup options card hidden');
+                }
+            });
+        },
+        
+        hidePickupSection() {
+            // Hide the entire pickup section
+            const pickupSection = document.getElementById('pickup-section');
+            if (pickupSection) {
+                pickupSection.style.display = 'none';
+                console.log('[CheckoutModifier] Pickup section hidden');
+            }
+            
+            // Also try alternative selectors
+            const pickupSections = document.querySelectorAll('[id*="pickup"], .pickup-section, [class*="pickup-section"]');
+            pickupSections.forEach(section => {
+                if (section.querySelector('input[name*="pickup"]')) {
+                    section.style.display = 'none';
+                    console.log('[CheckoutModifier] Additional pickup section hidden');
+                }
+            });
+        },
+        
+        // Watch for dynamic content
+        observeChanges() {
+            const observer = new MutationObserver(() => {
+                this.modifyPickupOptions();
+                this.hidePickupSection();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    };
+    
     // Initialize when ready
     ready(function() {
         // Initialize booking widget only on product pages
-        if (!PaymentDetector.isOrderSuccessPage()) {
+        if (!PaymentDetector.isOrderSuccessPage() && !CheckoutModifier.isCheckoutPage()) {
             initBookingWidget();
             hideCartButton();
         }
         
         // Initialize payment detector
         PaymentDetector.init();
+        
+        // Initialize checkout modifier
+        CheckoutModifier.init();
+        
+        // Watch for dynamic changes on checkout page
+        if (CheckoutModifier.isCheckoutPage()) {
+            CheckoutModifier.observeChanges();
+        }
     });
     
 })();
