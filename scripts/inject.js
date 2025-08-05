@@ -1519,12 +1519,28 @@
                 console.log('[CheckoutModifier] Pickup section hidden');
             }
             
-            // Also try alternative selectors
+            // Hide receiver section
+            const receiverSection = document.querySelector('.receiver-section');
+            if (receiverSection) {
+                receiverSection.style.display = 'none';
+                console.log('[CheckoutModifier] Receiver section hidden');
+            }
+            
+            // Also try alternative selectors for pickup sections
             const pickupSections = document.querySelectorAll('[id*="pickup"], .pickup-section, [class*="pickup-section"]');
             pickupSections.forEach(section => {
                 if (section.querySelector('input[name*="pickup"]')) {
                     section.style.display = 'none';
                     console.log('[CheckoutModifier] Additional pickup section hidden');
+                }
+            });
+            
+            // Hide any section containing receiver form
+            const receiverForms = document.querySelectorAll('.receiver-form, [class*="receiver"]');
+            receiverForms.forEach(form => {
+                if (form.querySelector('input[name*="receiver"]')) {
+                    form.style.display = 'none';
+                    console.log('[CheckoutModifier] Additional receiver form hidden');
                 }
             });
         },
