@@ -1245,10 +1245,22 @@
         },
         
         extractOrderId() {
-            // Extract from URL path
+            // Try to extract numeric order ID (what EasyStore API expects)
+            const numericId = this.extractNumericOrderId();
+            if (numericId) {
+                console.log('[PaymentDetector] Found numeric order ID:', numericId);
+                return numericId;
+            }
+            
+            // Fallback: Extract from URL path (might be a UUID)
             const path = window.location.pathname;
             const matches = path.match(/\/orders\/([a-zA-Z0-9-]+)/);
-            return matches ? matches[1] : null;
+            const urlId = matches ? matches[1] : null;
+            
+            console.warn('[PaymentDetector] Could not find numeric order ID, using URL ID:', urlId);
+            console.log('[PaymentDetector] This may cause API errors. Check the page for numeric order ID.');
+            
+            return urlId;
         },
         
         extractOrderNumber() {
@@ -1265,6 +1277,48 @@
                 if (match) {
                     return match[1];
                 }
+            }
+            
+            return null;
+        },
+        
+        extractNumericOrderId() {
+            // Look for numeric order ID in various places
+            // 1. Check meta tags
+            const metaOrderId = document.querySelector('meta[property="order:id"]')?.content;
+            if (metaOrderId && /^\d+$/.test(metaOrderId)) {
+                return metaOrderId;
+            }
+            
+            // 2. Check data attributes
+            const dataOrderId = document.querySelector('[data-order-id]')?.getAttribute('data-order-id');
+            if (dataOrderId && /^\d+$/.test(dataOrderId)) {
+                return dataOrderId;
+            }
+            
+            // 3. Look for order ID in scripts or JSON
+            const scripts = document.querySelectorAll('script');
+            for (const script of scripts) {
+                const content = script.textContent;
+                // Look for patterns like order_id: 12345 or "id": 12345
+                const patterns = [
+                    /order_id['":\s]+(\d+)/i,
+                    /"id"[:\s]+(\d+)/,
+                    /orderId['":\s]+(\d+)/i
+                ];
+                
+                for (const pattern of patterns) {
+                    const match = content.match(pattern);
+                    if (match) {
+                        return match[1];
+                    }
+                }
+            }
+            
+            // 4. Extract from order number if it's numeric
+            const orderNumber = this.extractOrderNumber();
+            if (orderNumber) {
+                return orderNumber;
             }
             
             return null;
@@ -1337,6 +1391,17 @@
         },
         
         async detectAndSync() {
+            // Add debugging info
+            console.log('[PaymentDetector] Page URL:', window.location.href);
+            console.log('[PaymentDetector] Page title:', document.title);
+            
+            // Log any visible order information
+            const pageText = document.body.innerText;
+            const orderMatch = pageText.match(/Order #\d+|#\d+/);
+            if (orderMatch) {
+                console.log('[PaymentDetector] Found order reference in page:', orderMatch[0]);
+            }
+            
             const orderData = this.extractOrderData();
             if (!orderData) {
                 console.error('[PaymentDetector] Could not extract order data');
