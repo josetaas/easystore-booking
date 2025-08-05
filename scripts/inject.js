@@ -13,6 +13,17 @@
             ? `${window.location.protocol}//${window.location.hostname}/api/availability`
             : 'https://stepsandstories.ngrok.app/api/availability',
         
+        // Backend URL for sync operations
+        backendUrl: window.location.hostname.includes('ngrok') 
+            ? `${window.location.protocol}//${window.location.hostname}`
+            : 'https://stepsandstories.ngrok.app',
+        
+        // API Key for sync operations (should be stored securely in production)
+        apiKey: 'aajE%991',
+        
+        // Enable payment detection
+        enablePaymentDetection: true,
+        
         // How many days ahead to show bookings
         daysAhead: 30,
         
@@ -1183,10 +1194,221 @@
         });
     }
     
+    // Payment Success Detection Module
+    const PaymentDetector = {
+        init() {
+            if (!CONFIG.enablePaymentDetection) {
+                console.log('[PaymentDetector] Disabled in configuration');
+                return;
+            }
+            
+            if (this.shouldDetectPayment()) {
+                console.log('[PaymentDetector] Order success page detected, initiating sync...');
+                this.detectAndSync();
+            }
+        },
+        
+        shouldDetectPayment() {
+            const isSuccessPage = this.isOrderSuccessPage();
+            const notAlreadyTriggered = !this.hasAlreadyTriggered();
+            
+            console.log('[PaymentDetector] Success page:', isSuccessPage, 'Not triggered:', notAlreadyTriggered);
+            return isSuccessPage && notAlreadyTriggered;
+        },
+        
+        isOrderSuccessPage() {
+            const path = window.location.pathname;
+            const params = new URLSearchParams(window.location.search);
+            
+            // Check URL pattern for order success page
+            const hasOrderPath = path.includes('/orders/');
+            const hasPaymentParam = params.get('payment_type') === 'sf_gateway_return';
+            
+            // Additional DOM confirmation
+            const hasThankYou = document.querySelector('h1')?.textContent?.toLowerCase().includes('thank') ||
+                                document.querySelector('h2')?.textContent?.toLowerCase().includes('thank');
+            
+            const hasOrderNumber = Array.from(document.querySelectorAll('*')).some(el => 
+                el.textContent?.includes('Order Number:') || 
+                el.textContent?.includes('Order #')
+            );
+            
+            return hasOrderPath && (hasPaymentParam || hasThankYou || hasOrderNumber);
+        },
+        
+        hasAlreadyTriggered() {
+            const orderId = this.extractOrderId();
+            if (!orderId) return false;
+            
+            const triggered = sessionStorage.getItem(`sync_triggered_${orderId}`);
+            return triggered === 'true';
+        },
+        
+        extractOrderId() {
+            // Extract from URL path
+            const path = window.location.pathname;
+            const matches = path.match(/\/orders\/([a-zA-Z0-9-]+)/);
+            return matches ? matches[1] : null;
+        },
+        
+        extractOrderNumber() {
+            // Try to find order number in the page
+            const patterns = [
+                /Order #(\d+)/,
+                /Order Number:\s*(\d+)/,
+                /#(\d+)/
+            ];
+            
+            const pageText = document.body.innerText;
+            for (const pattern of patterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    return match[1];
+                }
+            }
+            
+            return null;
+        },
+        
+        extractOrderData() {
+            const orderId = this.extractOrderId();
+            const orderNumber = this.extractOrderNumber();
+            
+            if (!orderId) {
+                console.error('[PaymentDetector] Could not extract order ID from URL');
+                return null;
+            }
+            
+            // Try to extract booking details from the order summary
+            const bookingDetails = this.extractBookingDetails();
+            
+            const orderData = {
+                orderId: orderId,
+                orderNumber: orderNumber ? `#${orderNumber}` : null,
+                timestamp: new Date().toISOString(),
+                pageUrl: window.location.href,
+                source: 'frontend-detection'
+            };
+            
+            if (bookingDetails) {
+                orderData.bookingDetails = bookingDetails;
+            }
+            
+            console.log('[PaymentDetector] Extracted order data:', orderData);
+            return orderData;
+        },
+        
+        extractBookingDetails() {
+            // Try to find booking date and time in the order summary
+            const details = {};
+            
+            // Look for booking date
+            const datePatterns = [
+                /Booking Date[:\s]+([^\n,]+)/i,
+                /Date[:\s]+([^\n,]+)/i,
+                /Appointment[:\s]+([^\n,]+)/i
+            ];
+            
+            const timePatterns = [
+                /Booking Time[:\s]+([^\n,]+)/i,
+                /Time[:\s]+([^\n,]+)/i,
+                /Slot[:\s]+([^\n,]+)/i
+            ];
+            
+            const pageText = document.body.innerText;
+            
+            for (const pattern of datePatterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    details.date = match[1].trim();
+                    break;
+                }
+            }
+            
+            for (const pattern of timePatterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    details.time = match[1].trim();
+                    break;
+                }
+            }
+            
+            return Object.keys(details).length > 0 ? details : null;
+        },
+        
+        async detectAndSync() {
+            const orderData = this.extractOrderData();
+            if (!orderData) {
+                console.error('[PaymentDetector] Could not extract order data');
+                return;
+            }
+            
+            try {
+                await this.triggerSync(orderData);
+                this.markAsTriggered(orderData.orderId);
+                console.log('[PaymentDetector] Sync triggered successfully for order:', orderData.orderId);
+            } catch (error) {
+                console.error('[PaymentDetector] Failed to trigger sync:', error);
+                // Don't mark as triggered on error, so it can be retried
+            }
+        },
+        
+        async triggerSync(orderData) {
+            const syncUrl = `${CONFIG.backendUrl}/api/sync-order`;
+            
+            console.log('[PaymentDetector] Triggering sync to:', syncUrl);
+            
+            const response = await fetch(syncUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Source': 'frontend-detection',
+                    'x-api-key': CONFIG.apiKey
+                },
+                body: JSON.stringify(orderData)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Sync failed: ${response.status} ${response.statusText} - ${errorData}`);
+            }
+            
+            const result = await response.json();
+            console.log('[PaymentDetector] Sync response:', result);
+            
+            // Show success indicator if possible
+            this.showSyncStatus(result);
+            
+            return result;
+        },
+        
+        showSyncStatus(result) {
+            // Try to show a subtle indicator that sync was successful
+            if (result.success && result.events && result.events.length > 0) {
+                const event = result.events[0];
+                console.log('[PaymentDetector] Calendar event created:', event.calendarEventLink);
+                
+                // You could add a subtle notification here if desired
+                // For now, just log it
+            }
+        },
+        
+        markAsTriggered(orderId) {
+            sessionStorage.setItem(`sync_triggered_${orderId}`, 'true');
+            console.log('[PaymentDetector] Marked order as synced:', orderId);
+        }
+    };
+    
     // Initialize when ready
     ready(function() {
-        initBookingWidget();
-        hideCartButton();
+        // Initialize booking widget only on product pages
+        if (!PaymentDetector.isOrderSuccessPage()) {
+            initBookingWidget();
+            hideCartButton();
+        }
+        
+        // Initialize payment detector
+        PaymentDetector.init();
     });
     
 })();
