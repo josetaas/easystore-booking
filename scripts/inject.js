@@ -1282,6 +1282,13 @@
             return null;
         },
         
+        extractUrlId() {
+            // Extract UUID from URL
+            const path = window.location.pathname;
+            const matches = path.match(/\/orders\/([a-zA-Z0-9-]+)/);
+            return matches ? matches[1] : null;
+        },
+        
         extractNumericOrderId() {
             // Look for numeric order ID in various places
             // 1. Check meta tags
@@ -1341,7 +1348,9 @@
                 orderNumber: orderNumber ? `#${orderNumber}` : null,
                 timestamp: new Date().toISOString(),
                 pageUrl: window.location.href,
-                source: 'frontend-detection'
+                source: 'frontend-detection',
+                // Include UUID from URL as fallback identifier
+                urlId: this.extractUrlId()
             };
             
             if (bookingDetails) {
