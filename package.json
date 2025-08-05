@@ -8,6 +8,7 @@
     "test:db": "node test-database.js",
     "test:api": "node test-easystore-api.js",
     "test:sync": "node test-sync-engine.js",
+    "test:endpoints": "node test-api-endpoints.js",
     "sync:order": "node test-sync-engine.js --order",
     "db:reset": "rm -f data/booking.db && echo 'Database reset'"
   },
