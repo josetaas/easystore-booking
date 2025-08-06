@@ -13,6 +13,17 @@
             ? `${window.location.protocol}//${window.location.hostname}/api/availability`
             : 'https://stepsandstories.ngrok.app/api/availability',
         
+        // Backend URL for sync operations
+        backendUrl: window.location.hostname.includes('ngrok') 
+            ? `${window.location.protocol}//${window.location.hostname}`
+            : 'https://stepsandstories.ngrok.app',
+        
+        // API Key for sync operations (should be stored securely in production)
+        apiKey: 'aajE%991',
+        
+        // Enable payment detection
+        enablePaymentDetection: true,
+        
         // How many days ahead to show bookings
         daysAhead: 30,
         
@@ -1183,10 +1194,389 @@
         });
     }
     
+    // Payment Success Detection Module
+    const PaymentDetector = {
+        init() {
+            if (!CONFIG.enablePaymentDetection) {
+                console.log('[PaymentDetector] Disabled in configuration');
+                return;
+            }
+            
+            if (this.shouldDetectPayment()) {
+                console.log('[PaymentDetector] Order success page detected, initiating sync...');
+                this.detectAndSync();
+            }
+        },
+        
+        shouldDetectPayment() {
+            const isSuccessPage = this.isOrderSuccessPage();
+            const notAlreadyTriggered = !this.hasAlreadyTriggered();
+            
+            console.log('[PaymentDetector] Success page:', isSuccessPage, 'Not triggered:', notAlreadyTriggered);
+            return isSuccessPage && notAlreadyTriggered;
+        },
+        
+        isOrderSuccessPage() {
+            const path = window.location.pathname;
+            const params = new URLSearchParams(window.location.search);
+            
+            // Check URL pattern for order success page
+            const hasOrderPath = path.includes('/orders/');
+            const hasPaymentParam = params.get('payment_type') === 'sf_gateway_return';
+            
+            // Additional DOM confirmation
+            const hasThankYou = document.querySelector('h1')?.textContent?.toLowerCase().includes('thank') ||
+                                document.querySelector('h2')?.textContent?.toLowerCase().includes('thank');
+            
+            const hasOrderNumber = Array.from(document.querySelectorAll('*')).some(el => 
+                el.textContent?.includes('Order Number:') || 
+                el.textContent?.includes('Order #')
+            );
+            
+            return hasOrderPath && (hasPaymentParam || hasThankYou || hasOrderNumber);
+        },
+        
+        hasAlreadyTriggered() {
+            const orderId = this.extractOrderId();
+            if (!orderId) return false;
+            
+            const triggered = sessionStorage.getItem(`sync_triggered_${orderId}`);
+            return triggered === 'true';
+        },
+        
+        extractOrderId() {
+            // Try to extract numeric order ID (what EasyStore API expects)
+            const numericId = this.extractNumericOrderId();
+            if (numericId) {
+                console.log('[PaymentDetector] Found numeric order ID:', numericId);
+                return numericId;
+            }
+            
+            // Fallback: Extract from URL path (might be a UUID)
+            const path = window.location.pathname;
+            const matches = path.match(/\/orders\/([a-zA-Z0-9-]+)/);
+            const urlId = matches ? matches[1] : null;
+            
+            console.warn('[PaymentDetector] Could not find numeric order ID, using URL ID:', urlId);
+            console.log('[PaymentDetector] This may cause API errors. Check the page for numeric order ID.');
+            
+            return urlId;
+        },
+        
+        extractOrderNumber() {
+            // Try to find order number in the page
+            const patterns = [
+                /Order #(\d+)/,
+                /Order Number:\s*(\d+)/,
+                /#(\d+)/
+            ];
+            
+            const pageText = document.body.innerText;
+            for (const pattern of patterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    return match[1];
+                }
+            }
+            
+            return null;
+        },
+        
+        extractUrlId() {
+            // Extract UUID from URL
+            const path = window.location.pathname;
+            const matches = path.match(/\/orders\/([a-zA-Z0-9-]+)/);
+            return matches ? matches[1] : null;
+        },
+        
+        extractNumericOrderId() {
+            // Look for numeric order ID in various places
+            // 1. Check meta tags
+            const metaOrderId = document.querySelector('meta[property="order:id"]')?.content;
+            if (metaOrderId && /^\d+$/.test(metaOrderId)) {
+                return metaOrderId;
+            }
+            
+            // 2. Check data attributes
+            const dataOrderId = document.querySelector('[data-order-id]')?.getAttribute('data-order-id');
+            if (dataOrderId && /^\d+$/.test(dataOrderId)) {
+                return dataOrderId;
+            }
+            
+            // 3. Look for order ID in scripts or JSON
+            const scripts = document.querySelectorAll('script');
+            for (const script of scripts) {
+                const content = script.textContent;
+                // Look for patterns like order_id: 12345 or "id": 12345
+                const patterns = [
+                    /order_id['":\s]+(\d+)/i,
+                    /"id"[:\s]+(\d+)/,
+                    /orderId['":\s]+(\d+)/i
+                ];
+                
+                for (const pattern of patterns) {
+                    const match = content.match(pattern);
+                    if (match) {
+                        return match[1];
+                    }
+                }
+            }
+            
+            // 4. Extract from order number if it's numeric
+            const orderNumber = this.extractOrderNumber();
+            if (orderNumber) {
+                return orderNumber;
+            }
+            
+            return null;
+        },
+        
+        extractOrderData() {
+            const orderId = this.extractOrderId();
+            const orderNumber = this.extractOrderNumber();
+            
+            if (!orderId) {
+                console.error('[PaymentDetector] Could not extract order ID from URL');
+                return null;
+            }
+            
+            // Try to extract booking details from the order summary
+            const bookingDetails = this.extractBookingDetails();
+            
+            const orderData = {
+                orderId: orderId,
+                orderNumber: orderNumber ? `#${orderNumber}` : null,
+                timestamp: new Date().toISOString(),
+                pageUrl: window.location.href,
+                source: 'frontend-detection',
+                // Include UUID from URL as fallback identifier
+                urlId: this.extractUrlId()
+            };
+            
+            if (bookingDetails) {
+                orderData.bookingDetails = bookingDetails;
+            }
+            
+            console.log('[PaymentDetector] Extracted order data:', orderData);
+            return orderData;
+        },
+        
+        extractBookingDetails() {
+            // Try to find booking date and time in the order summary
+            const details = {};
+            
+            // Look for booking date
+            const datePatterns = [
+                /Booking Date[:\s]+([^\n,]+)/i,
+                /Date[:\s]+([^\n,]+)/i,
+                /Appointment[:\s]+([^\n,]+)/i
+            ];
+            
+            const timePatterns = [
+                /Booking Time[:\s]+([^\n,]+)/i,
+                /Time[:\s]+([^\n,]+)/i,
+                /Slot[:\s]+([^\n,]+)/i
+            ];
+            
+            const pageText = document.body.innerText;
+            
+            for (const pattern of datePatterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    details.date = match[1].trim();
+                    break;
+                }
+            }
+            
+            for (const pattern of timePatterns) {
+                const match = pageText.match(pattern);
+                if (match) {
+                    details.time = match[1].trim();
+                    break;
+                }
+            }
+            
+            return Object.keys(details).length > 0 ? details : null;
+        },
+        
+        async detectAndSync() {
+            // Add debugging info
+            console.log('[PaymentDetector] Page URL:', window.location.href);
+            console.log('[PaymentDetector] Page title:', document.title);
+            
+            // Log any visible order information
+            const pageText = document.body.innerText;
+            const orderMatch = pageText.match(/Order #\d+|#\d+/);
+            if (orderMatch) {
+                console.log('[PaymentDetector] Found order reference in page:', orderMatch[0]);
+            }
+            
+            const orderData = this.extractOrderData();
+            if (!orderData) {
+                console.error('[PaymentDetector] Could not extract order data');
+                return;
+            }
+            
+            try {
+                await this.triggerSync(orderData);
+                this.markAsTriggered(orderData.orderId);
+                console.log('[PaymentDetector] Sync triggered successfully for order:', orderData.orderId);
+            } catch (error) {
+                console.error('[PaymentDetector] Failed to trigger sync:', error);
+                // Don't mark as triggered on error, so it can be retried
+            }
+        },
+        
+        async triggerSync(orderData) {
+            const syncUrl = `${CONFIG.backendUrl}/api/sync-order`;
+            
+            console.log('[PaymentDetector] Triggering sync to:', syncUrl);
+            
+            const response = await fetch(syncUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Source': 'frontend-detection',
+                    'x-api-key': CONFIG.apiKey
+                },
+                body: JSON.stringify(orderData)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`Sync failed: ${response.status} ${response.statusText} - ${errorData}`);
+            }
+            
+            const result = await response.json();
+            console.log('[PaymentDetector] Sync response:', result);
+            
+            // Show success indicator if possible
+            this.showSyncStatus(result);
+            
+            return result;
+        },
+        
+        showSyncStatus(result) {
+            // Try to show a subtle indicator that sync was successful
+            if (result.success && result.events && result.events.length > 0) {
+                const event = result.events[0];
+                console.log('[PaymentDetector] Calendar event created:', event.calendarEventLink);
+                
+                // You could add a subtle notification here if desired
+                // For now, just log it
+            }
+        },
+        
+        markAsTriggered(orderId) {
+            sessionStorage.setItem(`sync_triggered_${orderId}`, 'true');
+            console.log('[PaymentDetector] Marked order as synced:', orderId);
+        }
+    };
+    
+    // Checkout page modifications
+    const CheckoutModifier = {
+        init() {
+            if (!this.isCheckoutPage()) {
+                return;
+            }
+            
+            console.log('[CheckoutModifier] Checkout page detected, applying modifications...');
+            this.modifyPickupOptions();
+            this.hidePickupSection();
+        },
+        
+        isCheckoutPage() {
+            const path = window.location.pathname;
+            return path.includes('/checkout/') || path.includes('/sf/checkout/');
+        },
+        
+        modifyPickupOptions() {
+            // Select "I will pick up the order" option
+            const selfCollectRadio = document.querySelector('input[name="checkout[pickup_address][is_self_collect]"][value="true"]');
+            if (selfCollectRadio) {
+                selfCollectRadio.checked = true;
+                console.log('[CheckoutModifier] Self collect option selected');
+            }
+            
+            // Hide the pickup options card
+            // Find the card containing the pickup options
+            const pickupInputs = document.querySelectorAll('input[name="checkout[pickup_address][is_self_collect]"]');
+            pickupInputs.forEach(input => {
+                // Find parent card element
+                let card = input.closest('.card');
+                if (card) {
+                    card.style.display = 'none';
+                    console.log('[CheckoutModifier] Pickup options card hidden');
+                }
+            });
+        },
+        
+        hidePickupSection() {
+            // Hide the entire pickup section
+            const pickupSection = document.getElementById('pickup-section');
+            if (pickupSection) {
+                pickupSection.style.display = 'none';
+                console.log('[CheckoutModifier] Pickup section hidden');
+            }
+            
+            // Hide receiver section
+            const receiverSection = document.querySelector('.receiver-section');
+            if (receiverSection) {
+                receiverSection.style.display = 'none';
+                console.log('[CheckoutModifier] Receiver section hidden');
+            }
+            
+            // Also try alternative selectors for pickup sections
+            const pickupSections = document.querySelectorAll('[id*="pickup"], .pickup-section, [class*="pickup-section"]');
+            pickupSections.forEach(section => {
+                if (section.querySelector('input[name*="pickup"]')) {
+                    section.style.display = 'none';
+                    console.log('[CheckoutModifier] Additional pickup section hidden');
+                }
+            });
+            
+            // Hide any section containing receiver form
+            const receiverForms = document.querySelectorAll('.receiver-form, [class*="receiver"]');
+            receiverForms.forEach(form => {
+                if (form.querySelector('input[name*="receiver"]')) {
+                    form.style.display = 'none';
+                    console.log('[CheckoutModifier] Additional receiver form hidden');
+                }
+            });
+        },
+        
+        // Watch for dynamic content
+        observeChanges() {
+            const observer = new MutationObserver(() => {
+                this.modifyPickupOptions();
+                this.hidePickupSection();
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    };
+    
     // Initialize when ready
     ready(function() {
-        initBookingWidget();
-        hideCartButton();
+        // Initialize booking widget only on product pages
+        if (!PaymentDetector.isOrderSuccessPage() && !CheckoutModifier.isCheckoutPage()) {
+            initBookingWidget();
+            hideCartButton();
+        }
+        
+        // Initialize payment detector
+        PaymentDetector.init();
+        
+        // Initialize checkout modifier
+        CheckoutModifier.init();
+        
+        // Watch for dynamic changes on checkout page
+        if (CheckoutModifier.isCheckoutPage()) {
+            CheckoutModifier.observeChanges();
+        }
     });
     
 })();
