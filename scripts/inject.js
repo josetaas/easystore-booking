@@ -20,8 +20,8 @@
         // Enable payment detection
         enablePaymentDetection: true,
         
-        // How many days ahead to show bookings
-        daysAhead: 30,
+        // How many days ahead to show bookings (365 = 1 year)
+        daysAhead: 365,
         
         // Minimum days ahead for booking (e.g., 0 = can book same day, 1 = can't book same day)
         minDaysAhead: 1
@@ -211,22 +211,23 @@
                 const currentDateStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
                 const minDateStart = new Date(minBookingDate.getFullYear(), minBookingDate.getMonth(), minBookingDate.getDate());
                 const isPastDate = currentDateStart < minDateStart;
-                const isTooFarAhead = currentDate > new Date(today.getFullYear(), today.getMonth(), today.getDate() + CONFIG.daysAhead);
+                const maxBookingDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + CONFIG.daysAhead);
+                const isTooFarAhead = currentDate > maxBookingDate;
                 
                 if (!isCurrentMonth) {
                     dayElement.classList.add('other-month');
-                } else if (isPastDate || isTooFarAhead) {
+                }
+                
+                // Mark all dates as disabled initially (while loading)
+                // We'll enable them after availability data is loaded
+                if (isPastDate || isTooFarAhead) {
                     dayElement.classList.add('disabled');
+                    dayElement.classList.add('permanently-disabled'); // Won't be enabled later
                 } else {
-                    dayElement.classList.add('available-date');
-                    // Create a closure to capture the current date value
-                    (function(capturedDate) {
-                        dayElement.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            selectDate(new Date(capturedDate));
-                        });
-                    })(new Date(currentDate));
+                    // These dates are potentially bookable, but disabled while loading
+                    dayElement.classList.add('disabled');
+                    dayElement.classList.add('loading-availability');
+                    dayElement.dataset.potentiallyAvailable = 'true';
                 }
                 
                 dayElement.textContent = currentDate.getDate();
@@ -258,8 +259,12 @@
         loadingIndicator.style.display = 'block';
         
         try {
+            // Fetch availability for the current month plus some days from adjacent months
+            // This ensures we get availability for all visible dates in the calendar
             const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+            startDate.setDate(startDate.getDate() - 7); // Include previous week
             const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+            endDate.setDate(endDate.getDate() + 7); // Include next week
             
             const url = new URL(CONFIG.availabilityEndpoint);
             url.searchParams.append('start', startDate.toISOString().split('T')[0]);
@@ -275,6 +280,25 @@
                 businessHours = availability.businessHours;
                 console.log('Stored business hours from month view:', businessHours);
             }
+            
+            // First, enable all potentially available dates
+            document.querySelectorAll('[data-potentially-available="true"]').forEach(dayElement => {
+                // Remove the loading state
+                dayElement.classList.remove('disabled');
+                dayElement.classList.remove('loading-availability');
+                dayElement.classList.add('available-date');
+                
+                // Add click handler
+                const dateStr = dayElement.dataset.date;
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const clickDate = new Date(year, month - 1, day);
+                
+                dayElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectDate(clickDate);
+                });
+            });
             
             // Update calendar with availability
             availability.dates.forEach(dateInfo => {
@@ -295,10 +319,18 @@
                         
                         if (dayBusinessHours.length === 0) {
                             // We're closed this day
+                            dayElement.classList.remove('available-date');
+                            dayElement.classList.add('disabled');
                             dayElement.classList.add('closed-day');
+                            // Remove click handler
+                            dayElement.replaceWith(dayElement.cloneNode(true));
                         } else {
                             // We have hours but no availability - actually booked
+                            dayElement.classList.remove('available-date');
+                            dayElement.classList.add('disabled');
                             dayElement.classList.add('fully-booked');
+                            // Remove click handler
+                            dayElement.replaceWith(dayElement.cloneNode(true));
                         }
                     }
                 }
@@ -311,9 +343,23 @@
             
         } catch (error) {
             console.error('Error loading availability:', error);
-            // Fallback: assume all dates are available
-            document.querySelectorAll('.available-date').forEach(day => {
-                day.classList.add('has-availability');
+            // Fallback: enable potentially available dates on error
+            document.querySelectorAll('[data-potentially-available="true"]').forEach(dayElement => {
+                dayElement.classList.remove('disabled');
+                dayElement.classList.remove('loading-availability');
+                dayElement.classList.add('available-date');
+                dayElement.classList.add('has-availability');
+                
+                // Add click handler
+                const dateStr = dayElement.dataset.date;
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const clickDate = new Date(year, month - 1, day);
+                
+                dayElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectDate(clickDate);
+                });
             });
         }
         
@@ -1059,6 +1105,12 @@
                 cursor: not-allowed;
             }
             
+            .calendar-day.loading-availability {
+                color: #999;
+                cursor: wait;
+                opacity: 0.6;
+            }
+            
             .calendar-day.has-availability {
                 color: #333;
                 font-weight: normal;
@@ -1114,17 +1166,17 @@
             
             .time-slots-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                gap: 10px;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
             }
             
             .time-slot {
-                padding: 12px 16px;
+                padding: 10px 8px;
                 border: 2px solid #e5e7eb;
                 background: white;
-                border-radius: 10px;
+                border-radius: 8px;
                 cursor: pointer;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 500;
                 transition: all 0.15s ease;
                 text-align: center;
@@ -1155,11 +1207,12 @@
             
             @media (max-width: 640px) {
                 .time-slots-grid {
-                    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 6px;
                 }
                 
                 .time-slot {
-                    padding: 10px 12px;
+                    padding: 10px 8px;
                     font-size: 13px;
                 }
             }
