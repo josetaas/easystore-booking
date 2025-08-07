@@ -13,7 +13,8 @@
     "sync:order": "node test-sync-engine.js --order",
     "scheduler:run": "node test-scheduler.js --continuous",
     "scheduler:status": "node test-scheduler.js --status",
-    "db:reset": "rm -f data/booking.db && echo 'Database reset'"
+    "db:reset": "rm -f data/booking.db && echo 'Database reset'",
+    "minify:inject": "node scripts/minify.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
