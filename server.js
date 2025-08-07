@@ -50,13 +50,13 @@ const CONFIG = {
     },
     
     // Session duration in minutes
-    sessionDuration: 30,
+    sessionDuration: 20,
     
     // Timezone
     timezone: 'Asia/Manila', // Update to your timezone
     
     // Buffer time between sessions (minutes)
-    bufferTime: 15
+    bufferTime: 10
 };
 
 // Initialize Google Calendar API
@@ -397,6 +397,7 @@ app.post('/api/booking/create', async (req, res) => {
         }
         
         const startDateTime = createDateTime(date, time);
+        // Create event for session duration only (buffer is not part of the event)
         const endDateTime = new Date(startDateTime.getTime() + CONFIG.sessionDuration * 60000);
         
         // Include product name in the event title if provided
