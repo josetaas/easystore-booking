@@ -9,14 +9,10 @@
         // Your backend API endpoint for checking availability
         // Update this to your actual backend URL (ngrok or hosted service)
         // For development: Use same domain as the script is loaded from
-        availabilityEndpoint: window.location.hostname.includes('ngrok') 
-            ? `${window.location.protocol}//${window.location.hostname}/api/availability`
-            : 'https://stepsandstories.ngrok.app/api/availability',
+        availabilityEndpoint: 'https://stepsandstories.it.sparcproperties.com/api/availability',
         
         // Backend URL for sync operations
-        backendUrl: window.location.hostname.includes('ngrok') 
-            ? `${window.location.protocol}//${window.location.hostname}`
-            : 'https://stepsandstories.ngrok.app',
+        backendUrl: 'https://stepsandstories.it.sparcproperties.com',
         
         // API Key for sync operations (should be stored securely in production)
         apiKey: 'aajE%991',
@@ -402,11 +398,33 @@
                 return;
             }
             
-            // Create time slot buttons
+            // Group time slots by period of day
+            const timeGroups = {
+                morning: [],
+                afternoon: [],
+                evening: []
+            };
+            
+            dayBusinessHours.forEach(time => {
+                const hour = parseInt(time.split(':')[0]);
+                const isPM = time.includes('PM');
+                const hour24 = isPM && hour !== 12 ? hour + 12 : (hour === 12 && !isPM ? 0 : hour);
+                
+                if (hour24 < 12) {
+                    timeGroups.morning.push(time);
+                } else if (hour24 < 17) {
+                    timeGroups.afternoon.push(time);
+                } else {
+                    timeGroups.evening.push(time);
+                }
+            });
+            
+            // Create organized time slot display
             timeSlotsContainer.innerHTML = '';
             let hasAvailableSlots = false;
             
-            dayBusinessHours.forEach(time => {
+            // Helper function to create time slot button
+            const createSlotButton = (time) => {
                 const slotButton = document.createElement('button');
                 slotButton.className = 'time-slot';
                 slotButton.textContent = time;
@@ -426,7 +444,37 @@
                     slotButton.disabled = true;
                 }
                 
-                timeSlotsContainer.appendChild(slotButton);
+                return slotButton;
+            };
+            
+            // Create sections for each time period
+            const periods = [
+                { key: 'morning', label: 'Morning', icon: '🌅' },
+                { key: 'afternoon', label: 'Afternoon', icon: '☀️' },
+                { key: 'evening', label: 'Evening', icon: '🌆' }
+            ];
+            
+            periods.forEach(period => {
+                const times = timeGroups[period.key];
+                if (times.length > 0) {
+                    const section = document.createElement('div');
+                    section.className = 'time-period-section';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'time-period-header';
+                    header.innerHTML = `<span class="time-period-label">${period.label}</span>`;
+                    section.appendChild(header);
+                    
+                    const grid = document.createElement('div');
+                    grid.className = 'time-slots-grid';
+                    
+                    times.forEach(time => {
+                        grid.appendChild(createSlotButton(time));
+                    });
+                    
+                    section.appendChild(grid);
+                    timeSlotsContainer.appendChild(section);
+                }
             });
             
             if (!hasAvailableSlots) {
@@ -1042,17 +1090,41 @@
             #time-slots {
                 display: flex;
                 flex-direction: column;
-                gap: 12px;
+                gap: 24px;
                 margin: 24px 0;
             }
             
+            .time-period-section {
+                margin-bottom: 20px;
+            }
+            
+            .time-period-header {
+                margin-bottom: 16px;
+                padding-bottom: 8px;
+                border-bottom: 2px solid #f3f4f6;
+            }
+            
+            .time-period-label {
+                font-size: 14px;
+                font-weight: 600;
+                color: #6b7280;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .time-slots-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 10px;
+            }
+            
             .time-slot {
-                padding: 16px 20px;
+                padding: 12px 16px;
                 border: 2px solid #e5e7eb;
                 background: white;
                 border-radius: 10px;
                 cursor: pointer;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: 500;
                 transition: all 0.15s ease;
                 text-align: center;
@@ -1062,12 +1134,15 @@
             .time-slot.available:hover {
                 border-color: #ff6b35;
                 background: #ffede6;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.15);
             }
             
             .time-slot.selected {
                 background: #ff6b35;
                 color: white;
                 border-color: #ff6b35;
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
             }
             
             .time-slot.booked {
@@ -1075,6 +1150,18 @@
                 color: #9ca3af;
                 cursor: not-allowed;
                 border-color: #e5e7eb;
+                opacity: 0.6;
+            }
+            
+            @media (max-width: 640px) {
+                .time-slots-grid {
+                    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+                }
+                
+                .time-slot {
+                    padding: 10px 12px;
+                    font-size: 13px;
+                }
             }
             
             .secondary-button {
