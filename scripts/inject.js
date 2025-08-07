@@ -1009,6 +1009,28 @@
         }
     }
     
+    // Remove Safari theme color
+    function removeSafariThemeColor() {
+        // Remove any existing theme-color meta tags
+        const existingThemeColors = document.querySelectorAll('meta[name="theme-color"]');
+        existingThemeColors.forEach(tag => tag.remove());
+        
+        // Add a white/default theme color
+        const themeColorMeta = document.createElement('meta');
+        themeColorMeta.name = 'theme-color';
+        themeColorMeta.content = '#ffffff'; // White color
+        document.head.appendChild(themeColorMeta);
+        
+        // Also add for different media queries if needed
+        const darkThemeColorMeta = document.createElement('meta');
+        darkThemeColorMeta.name = 'theme-color';
+        darkThemeColorMeta.content = '#000000'; // Black for dark mode
+        darkThemeColorMeta.media = '(prefers-color-scheme: dark)';
+        document.head.appendChild(darkThemeColorMeta);
+        
+        console.log('[Safari Theme] Theme color set to default');
+    }
+    
     // Add custom styles
     function addCustomStyles() {
         const style = document.createElement('style');
@@ -1699,12 +1721,220 @@
         }
     };
     
+    // Video Replacement Module for Homepage
+    const VideoReplacer = {
+        init() {
+            // Only run on homepage
+            if (!this.isHomePage()) {
+                return;
+            }
+            
+            console.log('[VideoReplacer] Homepage detected, replacing YouTube video...');
+            this.replaceVideo();
+            this.observeForVideoSection();
+        },
+        
+        isHomePage() {
+            const path = window.location.pathname;
+            return path === '/' || path === '' || path === '/index' || path === '/home';
+        },
+        
+        replaceVideo() {
+            // Find the video section
+            const videoSection = document.querySelector('.video-bg-section');
+            if (!videoSection) {
+                console.log('[VideoReplacer] Video section not found yet');
+                return;
+            }
+            
+            // Find the deferred-media element
+            const deferredMedia = videoSection.querySelector('deferred-media');
+            if (!deferredMedia) {
+                console.log('[VideoReplacer] Deferred media element not found');
+                return;
+            }
+            
+            // Create new video element with CloudFront source
+            const videoContainer = document.createElement('div');
+            videoContainer.className = 'custom-video-container';
+            videoContainer.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                z-index: 0;
+            `;
+            
+            const video = document.createElement('video');
+            video.muted = true; // MUST be before setting src
+            video.playsInline = true;
+            video.loop = true;
+            video.autoplay = true;
+            video.setAttribute('playsinline', ''); // iOS Safari
+            video.setAttribute('webkit-playsinline', ''); // Older iOS
+            video.setAttribute('muted', ''); // Critical for autoplay
+            video.setAttribute('autoplay', '');
+            
+            video.style.cssText = `
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                min-width: 100%;
+                min-height: 100%;
+            `;
+            
+            // Set poster image 
+            video.poster = 'https://d1y4qg1xbumuwm.cloudfront.net/cover.png';
+            
+            // Add background image to container as fallback
+            videoContainer.style.backgroundImage = `url(https://d1y4qg1xbumuwm.cloudfront.net/cover.png)`;
+            videoContainer.style.backgroundSize = 'cover';
+            videoContainer.style.backgroundPosition = 'center';
+            videoContainer.style.backgroundRepeat = 'no-repeat';
+            
+            // For mobile, prioritize MP4 as it has better support
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // MP4 first for mobile
+                const mp4Source = document.createElement('source');
+                mp4Source.src = 'https://d1y4qg1xbumuwm.cloudfront.net/cover.mp4';
+                mp4Source.type = 'video/mp4';
+                video.appendChild(mp4Source);
+            }
+            
+            // WebM source
+            const webmSource = document.createElement('source');
+            webmSource.src = 'https://d1y4qg1xbumuwm.cloudfront.net/cover.webm';
+            webmSource.type = 'video/webm';
+            video.appendChild(webmSource);
+            
+            if (!isMobile) {
+                // MP4 fallback for desktop
+                const mp4Source = document.createElement('source');
+                mp4Source.src = 'https://d1y4qg1xbumuwm.cloudfront.net/cover.mp4';
+                mp4Source.type = 'video/mp4';
+                video.appendChild(mp4Source);
+            }
+            
+            // Handle video load events
+            video.addEventListener('loadeddata', () => {
+                console.log('[VideoReplacer] Video loaded successfully');
+                video.play().catch(e => {
+                    console.log('[VideoReplacer] Autoplay prevented, user interaction may be required');
+                });
+            });
+            
+            video.addEventListener('error', (e) => {
+                console.error('[VideoReplacer] Video loading error:', e);
+                // Fallback to poster image on error
+                videoContainer.style.backgroundImage = `url(https://d1y4qg1xbumuwm.cloudfront.net/cover.png)`;
+                videoContainer.style.backgroundSize = 'cover';
+                videoContainer.style.backgroundPosition = 'center';
+            });
+            
+            videoContainer.appendChild(video);
+            
+            // Replace the deferred-media element with our video
+            deferredMedia.style.display = 'none';
+            deferredMedia.parentNode.insertBefore(videoContainer, deferredMedia);
+            
+            // Ensure the video content wrapper stays on top
+            const contentWrapper = videoSection.querySelector('.video-bg-wrapper');
+            if (contentWrapper) {
+                contentWrapper.style.position = 'relative';
+                contentWrapper.style.zIndex = '1';
+            }
+            
+            console.log('[VideoReplacer] Video replacement complete');
+            
+            // Simplified video play handling
+            let videoPlaying = false;
+            
+            video.addEventListener('playing', () => {
+                console.log('[VideoReplacer] Video is playing');
+                videoPlaying = true;
+                // Hide background only when video is actually playing
+                videoContainer.style.backgroundImage = 'none';
+            });
+            
+            video.addEventListener('pause', () => {
+                console.log('[VideoReplacer] Video paused');
+                if (!videoPlaying) {
+                    // Show background if video never played
+                    videoContainer.style.backgroundImage = `url(https://d1y4qg1xbumuwm.cloudfront.net/cover.png)`;
+                }
+            });
+            
+            // Simple play attempt
+            const attemptPlay = () => {
+                const playPromise = video.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('[VideoReplacer] Autoplay successful');
+                    }).catch(error => {
+                        console.log('[VideoReplacer] Autoplay failed:', error.name);
+                        // Keep showing the background image
+                    });
+                }
+            };
+            
+            // Try to play when video can play through
+            video.addEventListener('canplaythrough', attemptPlay, { once: true });
+            
+            // Also try on user interaction
+            document.addEventListener('touchstart', () => {
+                if (!videoPlaying) {
+                    video.play();
+                }
+            }, { once: true });
+            
+            document.addEventListener('click', () => {
+                if (!videoPlaying) {
+                    video.play();
+                }
+            }, { once: true });
+        },
+        
+        observeForVideoSection() {
+            // Watch for dynamic loading of video section
+            const observer = new MutationObserver((mutations) => {
+                // Check if video section was added
+                const videoSection = document.querySelector('.video-bg-section');
+                if (videoSection && !videoSection.querySelector('.custom-video-container')) {
+                    console.log('[VideoReplacer] Video section dynamically loaded, replacing...');
+                    this.replaceVideo();
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    };
+    
     // Initialize when ready
     ready(function() {
+        // Remove Safari theme color on all pages
+        removeSafariThemeColor();
+        
+        // Initialize video replacer on homepage
+        VideoReplacer.init();
+        
+        // Hide cart button on ALL pages
+        hideCartButton();
+        
         // Initialize booking widget only on product pages
-        if (!PaymentDetector.isOrderSuccessPage() && !CheckoutModifier.isCheckoutPage()) {
+        if (!PaymentDetector.isOrderSuccessPage() && !CheckoutModifier.isCheckoutPage() && !VideoReplacer.isHomePage()) {
             initBookingWidget();
-            hideCartButton();
         }
         
         // Initialize payment detector

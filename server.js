@@ -231,6 +231,31 @@ async function getAvailableSlots(dateStr, productName = null) {
         
         const events = await getCalendarEvents(startOfDay, endOfDay);
         
+        // Check if there's an all-day "Closed" event
+        const hasClosedEvent = events.some(event => {
+            if (!event.summary) return false;
+            const eventTitle = event.summary.trim().toLowerCase();
+            const isClosed = eventTitle === 'closed' || eventTitle.startsWith('closed ') || eventTitle.startsWith('closed:');
+            
+            if (isClosed) {
+                // Log for debugging
+                console.log(`Found Closed event on ${dateStr}:`, {
+                    title: event.summary,
+                    start: event.start,
+                    end: event.end,
+                    allDay: event.start.date ? true : false
+                });
+                return true;
+            }
+            return false;
+        });
+        
+        // If there's a "Closed" event, no slots are available
+        if (hasClosedEvent) {
+            console.log(`Date ${dateStr} is marked as Closed - returning no available slots`);
+            return [];
+        }
+        
         // Check each business hour slot
         const availableSlots = [];
         
@@ -294,6 +319,24 @@ async function getAvailabilityForDateRange(startDateStr, endDateStr, productName
                     const eventStart = new Date(event.start.dateTime || event.start.date);
                     return eventStart >= dayStart && eventStart <= dayEnd;
                 });
+                
+                // Check if there's a "Closed" event for this day
+                const hasClosedEvent = dayEvents.some(event => {
+                    if (!event.summary) return false;
+                    const eventTitle = event.summary.trim().toLowerCase();
+                    return eventTitle === 'closed' || eventTitle.startsWith('closed ') || eventTitle.startsWith('closed:');
+                });
+                
+                // If there's a "Closed" event, mark as unavailable
+                if (hasClosedEvent) {
+                    results.push({
+                        date: dateStr,
+                        available: false,
+                        slots: []
+                    });
+                    currentDate.setDate(currentDate.getDate() + 1);
+                    continue;
+                }
                 
                 // Check availability for each slot
                 const availableSlots = [];
