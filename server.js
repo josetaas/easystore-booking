@@ -580,7 +580,7 @@ async function startServer() {
             console.log(`📅 Calendar integration active`);
             console.log(`💾 Database connected`);
             if (process.env.SYNC_ENABLED !== 'false') {
-                console.log(`⏰ Sync scheduler active (interval: ${process.env.SYNC_INTERVAL || '*/5 * * * *'})`);
+                console.log(`⏰ Sync scheduler active (interval: ${process.env.SYNC_INTERVAL || '*/1 * * * *'})`);
             }
             console.log(`🌐 API endpoints:`);
             console.log(`   GET  /api/availability?date=YYYY-MM-DD`);
