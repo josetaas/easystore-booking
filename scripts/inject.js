@@ -1721,6 +1721,79 @@
         }
     };
     
+    // Payment Methods Replacer Module
+    const PaymentMethodsReplacer = {
+        init() {
+            console.log('[PaymentMethodsReplacer] Initializing payment methods replacement...');
+            this.replacePaymentMethods();
+            this.observeForPaymentMethods();
+        },
+        
+        replacePaymentMethods() {
+            const paymentList = document.querySelector('ul.list.list-payment[role="list"]');
+            if (!paymentList) {
+                console.log('[PaymentMethodsReplacer] Payment methods list not found yet');
+                return;
+            }
+            
+            console.log('[PaymentMethodsReplacer] Found payment methods list, replacing...');
+            
+            // Clear existing payment methods
+            paymentList.innerHTML = '';
+            
+            // Payment methods to add
+            const paymentMethods = [
+                {
+                    src: 'https://d1y4qg1xbumuwm.cloudfront.net/gcash.png',
+                    alt: 'payment_gcash'
+                },
+                {
+                    src: 'https://d1y4qg1xbumuwm.cloudfront.net/bdo.png',
+                    alt: 'payment_bdo'
+                },
+                {
+                    src: 'https://d1y4qg1xbumuwm.cloudfront.net/aub.png',
+                    alt: 'payment_aub'
+                }
+            ];
+            
+            // Add new payment methods
+            paymentMethods.forEach(payment => {
+                const li = document.createElement('li');
+                li.className = 'list-payment__item';
+
+                const img = document.createElement('img');
+                img.src = payment.src;
+                img.alt = payment.alt;
+                img.loading = 'lazy';
+                img.width = 85;  // Use numeric value for width attribute
+
+                li.appendChild(img);
+                paymentList.appendChild(li);
+            });
+            
+            console.log('[PaymentMethodsReplacer] Payment methods replaced successfully');
+        },
+        
+        observeForPaymentMethods() {
+            // Watch for dynamic loading of payment methods
+            const observer = new MutationObserver((mutations) => {
+                const paymentList = document.querySelector('ul.list.list-payment[role="list"]');
+                if (paymentList && !paymentList.hasAttribute('data-methods-replaced')) {
+                    // Mark as processed to avoid duplicate replacement
+                    paymentList.setAttribute('data-methods-replaced', 'true');
+                    console.log('[PaymentMethodsReplacer] Payment methods dynamically loaded, replacing...');
+                    this.replacePaymentMethods();
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+    };
+
     // Video Replacement Module for Homepage
     const VideoReplacer = {
         init() {
@@ -1928,6 +2001,9 @@
         
         // Initialize video replacer on homepage
         VideoReplacer.init();
+        
+        // Initialize payment methods replacer
+        PaymentMethodsReplacer.init();
         
         // Hide cart button on ALL pages
         hideCartButton();
