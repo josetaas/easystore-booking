@@ -198,7 +198,8 @@ function hasConflict(slotStart, slotEnd, events, productName = null) {
         // If productName is specified, only check conflicts with same product
         if (productName && event.summary) {
             // Extract product name from event title (format: "Product Name - Customer Name")
-            const eventProductMatch = event.summary.match(/^(.+?)\s*-\s*/);
+            // Use greedy match to get everything up to the last hyphen
+            const eventProductMatch = event.summary.match(/^(.+)\s*-\s*[^-]+$/);
             const eventProductName = eventProductMatch ? eventProductMatch[1].trim() : event.summary.trim();
             
             // Check for exact match (case insensitive)
